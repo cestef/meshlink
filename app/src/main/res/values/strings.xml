@@ -1,0 +1,13 @@
+<resources>
+  <string name="app_name">MeshLink</string>
+  <string name="start_ble">Start Ble</string>
+  <string name="stop_ble">Stop Ble</string>
+  <string name="nearby_devices"><u>Nearby devices:</u></string>
+  <string name="start">Start</string>
+  <string name="my_user_id">My User ID:</string>
+  <string name="enter_message">Enter Message</string>
+  <string name="send">Send</string>
+  <string name="send_a_file">Send a file</string>
+  <string name="channel_description">Meshlink\'s Notification Channel</string>
+  <string name="channel_name">MeshLink</string>
+</resources>

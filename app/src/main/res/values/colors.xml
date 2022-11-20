@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <color name="oxford_100">#5E6892</color>
+  <color name="oxford_200">#515A7E</color>
+  <color name="oxford_300">#424967</color>
+  <color name="oxford_400">#3A405A</color>
+  <color name="givry_100">#F9DEC9</color>
+  <color name="givry_200">#F6CCAC</color>
+  <color name="givry_300">#F2B789</color>
+  <color name="givry_400">#F2B789</color>
+  <color name="givry_500">#F89649</color>
+  <color name="black">#000000</color>
+  <color name="white">#FFFFFF</color>
+</resources>
