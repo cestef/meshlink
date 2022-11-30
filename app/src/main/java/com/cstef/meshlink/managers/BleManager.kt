@@ -1,16 +1,19 @@
-package com.cstef.meshlink.ble
+package com.cstef.meshlink.managers
 
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import com.cstef.meshlink.EncryptionManager
-import com.cstef.meshlink.chat.Message
+import androidx.compose.runtime.mutableStateOf
+import com.cstef.meshlink.BleService
+import com.cstef.meshlink.util.struct.Chunk
+import com.cstef.meshlink.util.struct.Message
 import java.security.PublicKey
 
 val BluetoothAdapter?.isBleOn get() = this != null && isEnabled
@@ -24,10 +27,10 @@ class BleManager(
   private val context: Context,
   dataExchangeManager: BleDataExchangeManager,
   encryptionManager: EncryptionManager,
-  private val serviceHandler: Handler
+  serviceHandler: Handler
 ) {
 
-  var isStarted = false
+  var isStarted = mutableStateOf(false)
   private val tag = BleManager::class.java.canonicalName
   private val adapter get() = (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
 
@@ -37,7 +40,13 @@ class BleManager(
   private val callbackHandler = Handler(Looper.getMainLooper())
 
   private val clientManager =
-    ClientBleManager(context, dataExchangeManager, callbackHandler, encryptionManager, serviceHandler)
+    ClientBleManager(
+      context,
+      dataExchangeManager,
+      callbackHandler,
+      encryptionManager,
+      serviceHandler
+    )
   private val serverManager =
     ServerBleManager(context, dataExchangeManager, callbackHandler, encryptionManager)
 
@@ -54,7 +63,7 @@ class BleManager(
     Log.d(tag, "canBeServer: $canBeServer")
     if (canBeClient) clientManager.start(userId)
     if (canBeServer) serverManager.start(userId)
-    isStarted = true
+    isStarted.value = true
   }
 
   @SuppressLint("MissingPermission")
@@ -62,17 +71,26 @@ class BleManager(
     Log.d(tag, "BleManager stopped")
     if (canBeClient) clientManager.stop()
     if (canBeServer) serverManager.stop()
-    isStarted = false
+    isStarted.value = false
   }
+
   fun sendData(message: Message) {
-    val deviceAddress = clientManager.connectedServersIds[message.receiverId]
+    val deviceAddress = clientManager.connectedServersIds[message.recipientId]
     if (deviceAddress != null && clientManager.connectedGattServers.containsKey(deviceAddress)) {
       Log.d(tag, clientManager.connectedGattServers[deviceAddress]?.device?.address!!)
-      Log.d(tag, "Sending data to ${message.receiverId}")
+      Log.d(tag, "Sending data to ${message.recipientId}")
       clientManager.sendData(message)
+      val intent = Intent(BleService.ACTION_MESSAGES)
+      context.sendBroadcast(intent)
     } else {
-      Log.d(tag, "No connection to ${message.receiverId}, broadcasting data")
-      clientManager.broadcastData(message)
+      Log.d(tag, "No connection to ${message.recipientId}, broadcasting data")
+      if (message.type == Message.Type.TEXT) {
+        clientManager.broadcastData(message)
+        val intent = Intent(BleService.ACTION_MESSAGES)
+        context.sendBroadcast(intent)
+      } else {
+        Log.e(tag, "Cannot broadcast other than text messages")
+      }
     }
   }
 
@@ -89,7 +107,6 @@ class BleManager(
 
     /**
      * @param userId ID of the remote BLE device
-     * @param rssi RSSI of the remote BLE device
      */
     fun onUserConnected(userId: String) {}
 

@@ -15,33 +15,56 @@ import android.os.Bundle
 import android.os.IBinder
 import android.util.Log
 import android.view.WindowManager
-import android.widget.Button
 import android.widget.Toast
+import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import com.cstef.meshlink.ble.isBleOn
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.cstef.meshlink.managers.isBleOn
+import com.cstef.meshlink.screens.AddDeviceScreen
+import com.cstef.meshlink.screens.ChatScreen
+import com.cstef.meshlink.screens.ScanScreen
+import com.cstef.meshlink.ui.theme.AppTheme
+import com.cstef.meshlink.ui.theme.DarkColors
+import com.cstef.meshlink.ui.theme.LightColors
 import com.cstef.meshlink.util.RequestCode
 import com.cstef.meshlink.util.generateFriendlyId
 
 class MainActivity : AppCompatActivity() {
 
   var bleBinder: BleService.BleServiceBinder? = null
-  val isBleStarted get() = bleBinder?.isBleStarted ?: false
   var bleService: BleService? = null
   private val serviceConnection = BleServiceConnection()
   private var isServiceBound = false
-  var userId: String = ""
+  private var userId: String = ""
+
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
-    @Suppress("DEPRECATION")
-    window.setFlags(
-      WindowManager.LayoutParams.FLAG_FULLSCREEN,
-      WindowManager.LayoutParams.FLAG_FULLSCREEN
-    )
     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-
-    setContentView(R.layout.activity_main)
+    setContent {
+      LoadingScreen()
+    }
     val sharedPreference = getSharedPreferences("USER_SETTINGS", Context.MODE_PRIVATE)
     if (sharedPreference.getString("USER_ID", null) == null) {
       val editor = sharedPreference.edit()
@@ -51,11 +74,94 @@ class MainActivity : AppCompatActivity() {
     } else {
       userId = sharedPreference.getString("USER_ID", null) ?: generateFriendlyId()
     }
-    createNotificationChannel()
+    createNotificationChannels()
     bindService()
-    supportFragmentManager.beginTransaction()
-      .replace(R.id.fragment_container, ScanFragment())
-      .commit()
+  }
+
+  @Composable
+  private fun LoadingScreen() {
+    AppTheme {
+      Box(
+        modifier = Modifier
+          .fillMaxSize()
+          .background(if (isSystemInDarkTheme()) DarkColors.background else LightColors.background)
+      ) {
+        CircularProgressIndicator()
+      }
+    }
+  }
+
+  @ExperimentalAnimationApi
+  @ExperimentalMaterial3Api
+  @Composable
+  private fun App() {
+    AppTheme {
+      Box(
+        modifier = Modifier
+          .fillMaxSize()
+          .background(
+            if (isSystemInDarkTheme()) DarkColors.background else LightColors.background,
+          )
+      ) {
+        val started by bleBinder?.isBleStarted!!
+        val navController = rememberNavController()
+        NavHost(navController = navController, startDestination = "scan") {
+          composable("scan") {
+            Box(modifier = Modifier.fillMaxSize()) {
+              ScanScreen(bleBinder, userId) { navController.navigate("chat/$it") }
+              // Manually add a device via its ID
+              FloatingActionButton(
+                onClick = {
+                  navController.navigate("add")
+                },
+                modifier = Modifier
+                  .align(Alignment.BottomStart)
+                  .padding(24.dp)
+              ) {
+                Icon(
+                  imageVector = Icons.Rounded.Add,
+                  contentDescription = "Add device",
+                )
+              }
+              ExtendedFloatingActionButton(
+                onClick = {
+                  if (started) {
+                    stopBle()
+                  } else {
+                    startBle()
+                  }
+                },
+                icon = {
+                  Icon(
+                    imageVector = if (started) Icons.Rounded.Close else Icons.Filled.PlayArrow,
+                    contentDescription = "Start/Stop"
+                  )
+                },
+                text = { Text(text = if (started) "Stop" else "Start") },
+                modifier = Modifier
+                  .padding(24.dp)
+                  .align(Alignment.BottomEnd),
+              )
+            }
+          }
+          composable(
+            "chat/{deviceId}",
+            arguments = listOf(navArgument("deviceId") { type = NavType.StringType })
+          ) { backStackEntry ->
+            ChatScreen(
+              bleBinder, backStackEntry.arguments?.getString("deviceId")
+            ) {
+              navController.popBackStack()
+            }
+          }
+          composable("add") {
+            AddDeviceScreen(bleBinder, userId) {
+              navController.popBackStack()
+            }
+          }
+        }
+      }
+    }
   }
 
   override fun onDestroy() {
@@ -64,20 +170,14 @@ class MainActivity : AppCompatActivity() {
   }
 
   override fun onRequestPermissionsResult(
-    requestCode: Int,
-    permissions: Array<out String>,
-    grantResults: IntArray
+    requestCode: Int, permissions: Array<out String>, grantResults: IntArray
   ) {
     super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     if (requestCode == RequestCode.ACCESS_COARSE_LOCATION) {
-      if (grantResults.isNotEmpty() &&
-        grantResults.first() == PackageManager.PERMISSION_GRANTED
-      ) {
+      if (grantResults.isNotEmpty() && grantResults.first() == PackageManager.PERMISSION_GRANTED) {
         startBle()
       } else {
         Toast.makeText(this, "Location Permission required to scan", Toast.LENGTH_SHORT).show()
-        val startButton = findViewById<Button>(R.id.startButton)
-        startButton.text = getString(R.string.start_ble)
       }
     }
   }
@@ -143,48 +243,45 @@ class MainActivity : AppCompatActivity() {
     }
 
     if (ContextCompat.checkSelfPermission(
-        this,
-        Manifest.permission.ACCESS_COARSE_LOCATION
+        this, Manifest.permission.ACCESS_COARSE_LOCATION
       ) != PackageManager.PERMISSION_GRANTED && ContextCompat.checkSelfPermission(
-        this,
-        Manifest.permission.ACCESS_FINE_LOCATION
+        this, Manifest.permission.ACCESS_FINE_LOCATION
       ) != PackageManager.PERMISSION_GRANTED
     ) {
       requestMultiplePermissions.launch(
         arrayOf(
-          Manifest.permission.ACCESS_FINE_LOCATION,
-          Manifest.permission.ACCESS_COARSE_LOCATION
+          Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION
         )
       )
       return
     }
     bleService?.startBle(userId)
     Toast.makeText(this, "Ble Started", Toast.LENGTH_SHORT).show()
-    val startButton = findViewById<Button>(R.id.startButton)
-    startButton.text = getString(R.string.stop_ble)
   }
 
   fun stopBle() {
     bleService?.stopBle()
     Toast.makeText(this, "Ble Stopped", Toast.LENGTH_SHORT).show()
-    val startButton = findViewById<Button>(R.id.startButton)
-    startButton.text = getString(R.string.start_ble)
   }
 
-  private fun createNotificationChannel() {
+  private fun createNotificationChannels() {
     // Create the NotificationChannel, but only on API 26+ because
     // the NotificationChannel class is new and not in the support library
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       val name = getString(R.string.channel_name)
       val descriptionText = getString(R.string.channel_description)
       val importance = NotificationManager.IMPORTANCE_DEFAULT
-      val channel = NotificationChannel("data", name, importance).apply {
+      val dataChannel = NotificationChannel("data", name, importance).apply {
+        description = descriptionText
+      }
+      val messagesChannel = NotificationChannel("messages", name, importance).apply {
         description = descriptionText
       }
       // Register the channel with the system
       val notificationManager: NotificationManager =
         getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-      notificationManager.createNotificationChannel(channel)
+      notificationManager.createNotificationChannel(dataChannel)
+      notificationManager.createNotificationChannel(messagesChannel)
     }
   }
 
@@ -204,11 +301,16 @@ class MainActivity : AppCompatActivity() {
   }
 
   inner class BleServiceConnection : ServiceConnection {
+    @ExperimentalAnimationApi
+    @ExperimentalMaterial3Api
     override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
       Log.d("test006", "onServiceConnected")
       bleService = (service as BleService.BleServiceBinder).service
       bleBinder = service
       startBle()
+      setContent {
+        App()
+      }
     }
 
     override fun onServiceDisconnected(name: ComponentName?) {

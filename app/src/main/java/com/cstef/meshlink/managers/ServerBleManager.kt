@@ -1,4 +1,4 @@
-package com.cstef.meshlink.ble
+package com.cstef.meshlink.managers
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -14,8 +14,8 @@ import android.os.ParcelUuid
 import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
-import com.cstef.meshlink.EncryptionManager
 import com.cstef.meshlink.util.BleUuid
+import com.cstef.meshlink.util.struct.Chunk
 import com.cstef.meshlink.util.struct.KeyData
 import com.daveanthonythomas.moshipack.MoshiPack
 import java.util.*
@@ -58,8 +58,7 @@ class ServerBleManager(
   )
 
   private val bleService = BluetoothGattService(
-    UUID.fromString(BleUuid.SERVICE_UUID),
-    BluetoothGattService.SERVICE_TYPE_PRIMARY
+    UUID.fromString(BleUuid.SERVICE_UUID), BluetoothGattService.SERVICE_TYPE_PRIMARY
   ).apply {
     addCharacteristic(writeCharacteristic)
     addCharacteristic(userIdCharacteristic)
@@ -67,16 +66,13 @@ class ServerBleManager(
     addCharacteristic(userPublicKeyCharacteristic)
   }
 
-  private val advertiseSettings = AdvertiseSettings.Builder()
-    .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED)
-    .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
-    .setTimeout(0)
-    .setConnectable(true)
-    .build()
+  private val advertiseSettings =
+    AdvertiseSettings.Builder().setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED)
+      .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH).setTimeout(0).setConnectable(true)
+      .build()
 
-  private val advertiseData = AdvertiseData.Builder()
-    .addServiceUuid(ParcelUuid.fromString(BleUuid.SERVICE_UUID))
-    .build()
+  private val advertiseData =
+    AdvertiseData.Builder().addServiceUuid(ParcelUuid.fromString(BleUuid.SERVICE_UUID)).build()
 
   private val advertiseCallback = object : AdvertiseCallback() {}
 
@@ -91,7 +87,6 @@ class ServerBleManager(
       characteristic: BluetoothGattCharacteristic?
     ) {
       super.onCharacteristicReadRequest(device, requestId, offset, characteristic)
-      // send data to remote BLE client
       when (characteristic?.uuid.toString()) {
         BleUuid.USER_ID_UUID -> {
           callbackHandler.post {
@@ -108,13 +103,11 @@ class ServerBleManager(
         BleUuid.USER_PUBLIC_KEY_UUID -> {
           callbackHandler.post {
             if (userId != null) {
-              val data =
-                moshi.packToByteArray(
-                  KeyData(
-                    Base64.getEncoder().encodeToString(encryptionManager.publicKey.encoded),
-                    userId!!
-                  )
+              val data = moshi.packToByteArray(
+                KeyData(
+                  Base64.getEncoder().encodeToString(encryptionManager.publicKey.encoded), userId!!
                 )
+              )
               gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, data)
             } else {
               gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, offset, null)
@@ -135,17 +128,9 @@ class ServerBleManager(
       value: ByteArray?
     ) {
       super.onCharacteristicWriteRequest(
-        device,
-        requestId,
-        characteristic,
-        preparedWrite,
-        responseNeeded,
-        offset,
-        value
+        device, requestId, characteristic, preparedWrite, responseNeeded, offset, value
       )
       callbackHandler.post {
-        characteristic?.value = value
-//        Log.d("ServerBleManager", "onCharacteristicWriteRequest: ${String(value!!)}")
         try {
           val chunk = value?.let { Chunk.fromByteArray(it) }
           device?.address?.let {
@@ -155,22 +140,14 @@ class ServerBleManager(
           }
           if (responseNeeded) {
             gattServer?.sendResponse(
-              device,
-              requestId,
-              BluetoothGatt.GATT_SUCCESS,
-              offset,
-              null
+              device, requestId, BluetoothGatt.GATT_SUCCESS, offset, null
             )
           }
         } catch (e: Exception) {
           Log.e("ServerBleManager", "onCharacteristicWriteRequest: ", e)
           if (responseNeeded) {
             gattServer?.sendResponse(
-              device,
-              requestId,
-              BluetoothGatt.GATT_FAILURE,
-              offset,
-              null
+              device, requestId, BluetoothGatt.GATT_FAILURE, offset, null
             )
           }
         }
@@ -181,11 +158,9 @@ class ServerBleManager(
 
   fun start(myUserId: String) {
     if (ActivityCompat.checkSelfPermission(
-        context,
-        Manifest.permission.BLUETOOTH_CONNECT
+        context, Manifest.permission.BLUETOOTH_CONNECT
       ) == PackageManager.PERMISSION_GRANTED || (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && ActivityCompat.checkSelfPermission(
-        context,
-        Manifest.permission.BLUETOOTH_ADMIN
+        context, Manifest.permission.BLUETOOTH_ADMIN
       ) == PackageManager.PERMISSION_GRANTED)
     ) {
       userId = myUserId
@@ -196,14 +171,11 @@ class ServerBleManager(
 
   fun stop() {
     if ((ActivityCompat.checkSelfPermission(
-        context,
-        Manifest.permission.BLUETOOTH_CONNECT
+        context, Manifest.permission.BLUETOOTH_CONNECT
       ) == PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
-        context,
-        Manifest.permission.BLUETOOTH_ADVERTISE
+        context, Manifest.permission.BLUETOOTH_ADVERTISE
       ) == PackageManager.PERMISSION_GRANTED) || (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && ActivityCompat.checkSelfPermission(
-        context,
-        Manifest.permission.BLUETOOTH_ADMIN
+        context, Manifest.permission.BLUETOOTH_ADMIN
       ) == PackageManager.PERMISSION_GRANTED)
     ) {
       Log.d("ServerBleManager", "Closing server")

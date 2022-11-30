@@ -1,4 +1,4 @@
-package com.cstef.meshlink
+package com.cstef.meshlink.managers
 
 import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
@@ -14,7 +14,7 @@ import javax.crypto.spec.SecretKeySpec
 class EncryptionManager {
   companion object {
     const val KEY_ALIAS = "com.cstef.meshlink"
-    const val KEY_SIZE = 2048
+    const val RSA_KEY_SIZE = 2048
   }
 
   private var keyStore: KeyStore = KeyStore.getInstance("AndroidKeyStore").apply {
@@ -46,7 +46,7 @@ class EncryptionManager {
       generator.initialize(builder.build())
     } else {
       generator = KeyPairGenerator.getInstance("RSA")
-      generator.initialize(KEY_SIZE)
+      generator.initialize(RSA_KEY_SIZE)
     }
 
     return generator.generateKeyPair()
@@ -94,6 +94,7 @@ class EncryptionManager {
   fun decrypt(data: String): String {
     getAsymmetricKeyPair()?.let {
       val parts = data.split(":")
+      if (parts.size != 2) return data // The data is not encrypted (or not encrypted with this app)
       val encryptedKey = Base64.decode(parts[0], Base64.DEFAULT)
       val encryptedData = Base64.decode(parts[1], Base64.DEFAULT)
 

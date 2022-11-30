@@ -1,24 +1,27 @@
 package com.cstef.meshlink
 
+import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.os.*
 import android.util.Log
 import android.widget.Toast
 import androidx.annotation.RequiresApi
-import com.cstef.meshlink.ble.BleData
-import com.cstef.meshlink.ble.BleManager
-import com.cstef.meshlink.ble.Chunk
-import com.cstef.meshlink.chat.Message
+import androidx.core.app.NotificationCompat
+import com.cstef.meshlink.managers.BleManager
+import com.cstef.meshlink.managers.EncryptionManager
+import com.cstef.meshlink.util.struct.BleData
+import com.cstef.meshlink.util.struct.Chunk
 import com.cstef.meshlink.util.struct.ConnectedDevice
+import com.cstef.meshlink.util.struct.Message
 import com.daveanthonythomas.moshipack.MoshiPack
 import java.security.PublicKey
+import java.util.*
 
 
 class BleService : Service() {
   companion object {
-    val EXTRA_DEVICES = "com.cstef.meshlink.devices"
-    val EXTRA_MESSAGES = "com.cstef.meshlink.messages"
+    const val EXTRA_DEVICES = "com.cstef.meshlink.devices"
     val ACTION_USER = Intent("com.cstef.meshlink.ACTION_USER")
     val ACTION_MESSAGES = Intent("com.cstef.meshlink.ACTION_MESSAGES")
   }
@@ -40,8 +43,8 @@ class BleService : Service() {
     val isBleStarted
       get() = bleManager.isStarted
 
-    fun sendMessage(receiverId: String, message: String, type: String = "text") {
-      this@BleService.sendMessage(receiverId, message, type)
+    fun sendMessage(receiverId: String, message: String, type: String = Message.Type.TEXT) {
+      this@BleService.sendMessage(BleData(userId, message, receiverId, type))
     }
 
     fun getMessages(receiverId: String): List<Message> {
@@ -50,6 +53,10 @@ class BleService : Service() {
 
     fun getConnectedDevices(): List<ConnectedDevice> {
       return connectedDevices
+    }
+
+    fun addDevice(userId: String) {
+      bleDataExchangeManager.onUserConnected(userId)
     }
   }
 
@@ -65,9 +72,6 @@ class BleService : Service() {
       if (!connectedDevices.any { it.id == userId }) {
         connectedDevices.add(ConnectedDevice(userId, null, 0, true, System.currentTimeMillis()))
         val intent = Intent(ACTION_USER)
-        val devices = connectedDevices.toCollection(ArrayList())
-        Log.d("BleService", "Sending devices: $devices")
-        intent.putParcelableArrayListExtra(EXTRA_DEVICES, devices)
         sendBroadcast(intent)
       } else {
         connectedDevices.find { it.id == userId }?.let {
@@ -86,6 +90,13 @@ class BleService : Service() {
         Log.d("BleService", "public key unknown")
         publicKeys[userId] = publicKey
       }
+    }
+
+    override fun onMessageSent(userId: String) {
+      Log.d("BleService", "onMessageSent: $userId")
+      // Refresh chat fragment
+      val intent = Intent(ACTION_MESSAGES)
+      sendBroadcast(intent)
     }
 
     override fun onChunkReceived(chunk: Chunk, address: String) {
@@ -116,20 +127,42 @@ class BleService : Service() {
           messagesHashes[bleData.senderId]?.add(hash)
           bleData.content = encryptionManager.decrypt(bleData.content)
           val messagesForUser = messages.getOrPut(bleData.senderId) { mutableListOf() }
+          val newMessage = Message.fromBleData(
+            bleData, false
+          )
           messagesForUser.add(
-            Message.fromBleData(
-              bleData, false
+            newMessage
+          )
+          Log.d(
+            "BleService", "onDataReceived: ${newMessage.senderId}: ${newMessage.content}"
+          )
+          // Send notification to user phone
+          val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+          val notification = NotificationCompat.Builder(this@BleService, "messages")
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle("MeshLink")
+            .setContentText(
+              if (newMessage.type == Message.Type.TEXT) "${newMessage.senderId}: ${newMessage.content}" else "${newMessage.senderId}: ${
+                newMessage.type.replaceFirstChar {
+                  if (it.isLowerCase()) it.titlecase(
+                    Locale.ROOT
+                  ) else it.toString()
+                }
+              }"
             )
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .build()
+          notificationManager.notify(
+            newMessage.senderId.hashCode(), notification
           )
           messages[bleData.senderId] = messagesForUser
           val intent = Intent(ACTION_MESSAGES)
-          intent.putExtra(EXTRA_MESSAGES, HashMap(messages))
           sendBroadcast(intent)
-          Toast.makeText(application, "Received: ${bleData.content}", Toast.LENGTH_SHORT).show()
-        } else {
+        } else if (listOf(Message.Type.TEXT).contains(bleData.type) && bleData.ttl > 0) {
           Log.d("BleService", "onDataReceived: not for me")
           Toast.makeText(application, "Propagating a message", Toast.LENGTH_SHORT).show()
-          sendMessage(bleData.recipientId, bleData.content)
+          bleData.ttl -= 1
+          sendMessage(bleData)
         }
       }
     }
@@ -142,14 +175,10 @@ class BleService : Service() {
           connectedDevices[it].connected = false
           connectedDevices[it].lastSeen = System.currentTimeMillis()
           val intent = Intent(ACTION_USER)
-          val devices = connectedDevices.toCollection(ArrayList())
-          Log.d("BleService", "Sending devices: $devices")
-          intent.putParcelableArrayListExtra(EXTRA_DEVICES, devices)
           sendBroadcast(intent)
         }
       }
       val intent = Intent(ACTION_USER)
-      intent.putParcelableArrayListExtra(EXTRA_DEVICES, connectedDevices.toCollection(ArrayList()))
       sendBroadcast(intent)
     }
 
@@ -184,19 +213,18 @@ class BleService : Service() {
   fun startBle(userId: String) {
     Log.d("BleService", "startBle")
     this.userId = userId
-    if (!bleManager.isStarted) bleManager.start(userId)
+    if (!bleManager.isStarted.value) bleManager.start(userId)
   }
 
   fun stopBle() {
-    if (bleManager.isStarted) bleManager.stop()
+    if (bleManager.isStarted.value) bleManager.stop()
   }
 
-  fun sendMessage(recipientId: String?, content: String, type: String = "text") {
-    val messageData = Message(userId, recipientId, content, type, System.currentTimeMillis(), true)
-    messages.getOrPut(recipientId ?: "broadcast") { mutableListOf() }.add(messageData)
-    val intent = Intent(ACTION_MESSAGES)
-    intent.putExtra(EXTRA_MESSAGES, HashMap(messages))
-    sendBroadcast(intent)
-    bleManager.sendData(messageData)
+  fun sendMessage(bleData: BleData) {
+    if (bleData.recipientId != null) {
+      val messageData = Message.fromBleData(bleData, true)
+      messages.getOrPut(bleData.recipientId) { mutableListOf() }.add(messageData)
+      bleManager.sendData(messageData)
+    }
   }
 }

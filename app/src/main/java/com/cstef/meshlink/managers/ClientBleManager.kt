@@ -1,4 +1,4 @@
-package com.cstef.meshlink.ble
+package com.cstef.meshlink.managers
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -18,12 +18,9 @@ import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import com.cstef.meshlink.EncryptionManager
 import com.cstef.meshlink.R
-import com.cstef.meshlink.chat.Message
 import com.cstef.meshlink.util.BleUuid
-import com.cstef.meshlink.util.struct.KeyData
-import com.cstef.meshlink.util.struct.OperationQueue
+import com.cstef.meshlink.util.struct.*
 import com.daveanthonythomas.moshipack.MoshiPack
 import java.security.KeyFactory
 import java.security.spec.X509EncodedKeySpec
@@ -43,7 +40,7 @@ class ClientBleManager(
 
   // Used to execute ble operation in sequence across one or
   // multiple device. All BLE callbacks should call OperationQueue#operationComplete
-  private val operationQueue = OperationQueue(10000, handler)
+  private val operationQueue = OperationQueue(30000, handler)
   private val chunksOperationQueue = OperationQueue(30000, handler)
 
   // references of the connected servers are kept so they can by manually
@@ -194,8 +191,57 @@ class ClientBleManager(
       }
     }
 
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    @SuppressLint("MissingPermission")
+    override fun onCharacteristicRead(
+      gatt: BluetoothGatt,
+      characteristic: BluetoothGattCharacteristic,
+      value: ByteArray,
+      status: Int
+    ) {
+      super.onCharacteristicRead(gatt, characteristic, value, status)
+      Log.d("ClientBleManager", "onCharacteristicRead: ${characteristic.uuid}")
+      operationQueue.operationComplete()
+      if (status == BluetoothGatt.GATT_SUCCESS) {
+        when (characteristic.uuid?.toString()) {
+          BleUuid.USER_ID_UUID -> {
+            val userId = value.toString(Charsets.UTF_8)
+            Log.d(
+              "ClientBleManager", "onCharacteristicRead: userId = $userId"
+            )
+            connectedServersIds[userId] = gatt.device.address
+            operationQueue.execute { gatt.readPublicKey() }
+
+            callbackHandler.post {
+              dataExchangeManager.onUserConnected(userId)
+            }
+          }
+          BleUuid.USER_PUBLIC_KEY_UUID -> {
+            val msg = moshi.unpack<KeyData>(value)
+            Log.d("ClientBleManager", "onCharacteristicRead: msg.key = ${msg.key}")
+            val publicKey = KeyFactory.getInstance("RSA")
+              .generatePublic(X509EncodedKeySpec(Base64.getDecoder().decode(msg.key)))
+            Log.d(
+              "ClientBleManager", "onCharacteristicRead: publicKey = $publicKey"
+            )
+            callbackHandler.post {
+              dataExchangeManager.onUserPublicKeyReceived(
+                msg.userId, publicKey
+              )
+            }
+          }
+        }
+
+      } else {
+        Log.e("ClientBleManager", "onCharacteristicRead: failed to read characteristic")
+        gatt.disconnect()
+      }
+    }
+
     @RequiresApi(Build.VERSION_CODES.O)
     @SuppressLint("MissingPermission")
+    @Suppress("DEPRECATION")
+    @Deprecated("Use onCharacteristicRead instead")
     override fun onCharacteristicRead(
       gatt: BluetoothGatt?, characteristic: BluetoothGattCharacteristic?, status: Int
     ) {
@@ -256,26 +302,36 @@ class ClientBleManager(
       if (chunkState != null) {
         Log.d(
           "ClientBleManager",
-          "onCharacteristicWrite: chunkState = ${chunkState.chunksSent} / ${chunkState.chunksTotal}"
+          "onCharacteristicWrite: chunkState = ${chunkState.chunksSent + 1} / ${chunkState.chunksTotal}"
         )
-        chunkState.builder.setProgress(
-          chunkState.chunksTotal, chunkState.chunksSent, false
-        )
-        val notificationManager = NotificationManagerCompat.from(context)
-        notificationManager.notify(chunkState.notificationId, chunkState.builder.build())
         if (status == BluetoothGatt.GATT_SUCCESS) {
           chunkState.chunksSent++
           if (chunkState.chunksSent == chunkState.chunksTotal) {
-            sendingChunks.remove(gatt?.device?.address)
-            operationQueue.operationComplete()
+            Log.d(
+              "ClientBleManager",
+              "onCharacteristicWrite: finished sending ${chunkState.chunksSent}/${chunkState.chunksTotal} chunks"
+            )
+            chunkState.builder
+              .setContentTitle("Upload complete")
+              .setProgress(chunkState.chunksTotal, chunkState.chunksSent, false)
+              .setOngoing(false)
+              .setAutoCancel(true)
+              .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+
+            val notificationManager = NotificationManagerCompat.from(context)
+            notificationManager.notify(chunkState.notificationId, chunkState.builder.build())
             callbackHandler.post {
               dataExchangeManager.onMessageSent(chunkState.userId)
             }
-            chunkState.builder.setContentText("Upload complete").setProgress(0, 0, false)
-              .setOngoing(false)
-
+          } else {
+            chunkState.builder.setProgress(
+              chunkState.chunksTotal, chunkState.chunksSent, false
+            )
+            val notificationManager = NotificationManagerCompat.from(context)
             notificationManager.notify(chunkState.notificationId, chunkState.builder.build())
           }
+        } else {
+          Log.e("ClientBleManager", "onCharacteristicWrite: chunkState == null")
         }
       }
     }
@@ -348,35 +404,31 @@ class ClientBleManager(
   @SuppressLint("MissingPermission")
   private fun BluetoothGatt.writeData(data: BleData) {
     // Log.d("ClientBleManager", "writeData: $data")
-    val newBleData = BleData(
-      data.senderId,
-      if (data.recipientId != null && data.senderId == userId) (encryptionManager.encrypt(
-        data.content, dataExchangeManager.getPublicKeyForUser(data.recipientId)
-      )) else data.content,
-      data.recipientId
-    )
-    val value = moshi.packToByteArray(newBleData)
+    val publicKeyForUser = data.recipientId?.let { dataExchangeManager.getPublicKeyForUser(it) }
+    data.content =
+      if (data.recipientId != null && data.senderId == userId && publicKeyForUser != null) (encryptionManager.encrypt(
+        data.content, publicKeyForUser
+      ))
+      else data.content
+    val value = moshi.packToByteArray(data)
     Log.d("ClientBleManager", "writeData: value.size = ${value.size}")
 
-    val chunks = value.chunked(506) // MTU (512) - Header (4) - Chunk metadata (2) = 512-4-2 = 506
+    val chunks = value.chunked(505) // MTU (512) - Header (4) - Chunk metadata (3) = 512-4-3 = 505
     Log.d("ClientBleManager", "writeData: chunks.size = ${chunks.size}")
     // Create a notification
     if (chunks.size > 1) {
-      notification =
-        NotificationCompat.Builder(context, "data")
-          .setSmallIcon(R.drawable.ic_baseline_bluetooth_24)
-          .setContentTitle("Sending data")
-          .setContentText("Sending data to ${newBleData.recipientId}")
-          .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-          .setOngoing(true)
-          .setProgress(chunks.size, 0, false)
+      notification = NotificationCompat.Builder(context, "data")
+        .setSmallIcon(R.drawable.ic_baseline_bluetooth_24).setContentTitle("Sending data")
+        .setContentText("Sending data to ${data.recipientId}")
+        .setPriority(NotificationCompat.PRIORITY_DEFAULT).setSilent(true).setOngoing(true)
+        .setProgress(chunks.size, 0, false)
       val notificationManager = NotificationManagerCompat.from(context)
-      val notificationId = newBleData.recipientId.hashCode()
+      val notificationId = data.recipientId.hashCode()
       notificationManager.notify(
         notificationId, notification!!.build()
       )
       sendingChunks[device.address] = ChunkSendingState(
-        0, chunks.size, notification!!, newBleData.recipientId!!, notificationId
+        0, chunks.size, notification!!, data.recipientId!!, notificationId
       )
     }
     chunks.forEachIndexed { index, chunk ->
@@ -395,10 +447,16 @@ class ClientBleManager(
       )
     )
     if (characteristic != null) {
-      characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
-      characteristic.value = chunk.toByteArray()
-      writeCharacteristic(characteristic)
-      Log.d("ClientBleManager", "writeData: chunk ${chunk.index} written")
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        writeCharacteristic(
+          characteristic, chunk.toByteArray(), BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+        )
+      } else {
+        characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+        @Suppress("DEPRECATION") characteristic.value = chunk.toByteArray()
+        @Suppress("DEPRECATION") writeCharacteristic(characteristic)
+      }
+      Log.d("ClientBleManager", "writeData: chunk ${chunk.index + 1} written")
     } else {
       Log.w("ClientBleManager", "sendChunk: characteristic is null")
       disconnect()
@@ -406,13 +464,16 @@ class ClientBleManager(
   }
 
   fun broadcastData(message: Message) {
-    val bleData = BleData(message.senderId, message.content, message.receiverId)
-    connectedGattServers.values.forEach { it.writeData(bleData) }
+    val bleData = BleData.fromMessage(message)
+    connectedGattServers.values.filter { connectedServersIds.entries.find { entry -> entry.value == it.device.address }?.key != message.senderId }
+      .forEach {
+        it.writeData(bleData)
+      }
   }
 
   fun sendData(message: Message) {
-    val bleData = BleData(message.senderId, message.content, message.receiverId, message.type)
-    val deviceAddress = connectedServersIds[message.receiverId]
+    val bleData = BleData.fromMessage(message)
+    val deviceAddress = connectedServersIds[message.recipientId]
     if (deviceAddress != null) {
       connectedGattServers[deviceAddress]?.writeData(bleData)
     } else {

@@ -1,4 +1,4 @@
-package com.cstef.meshlink.ble
+package com.cstef.meshlink.util.struct
 
 import kotlin.experimental.or
 
@@ -12,7 +12,6 @@ import kotlin.experimental.or
 // The maximum number of chunks is 2^15 = 32768
 // The maximum size of the data is 32768 * 506 = 16'580'608 bytes = 16.5 MB
 // A transfer of 16.5 MB with an average speed of 23 chunks per second would take 16.5 MB / (23 * 506) = ~8 minutes
-
 class Chunk(val isLast: Boolean, val index: Short, val data: ByteArray) {
   fun toByteArray(): ByteArray {
     val byteArray = ByteArray(data.size + 2)
