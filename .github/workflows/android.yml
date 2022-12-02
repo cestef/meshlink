@@ -2,7 +2,7 @@ name: Build, Test and Compile
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
 
 jobs:
   Unit-Test:
