@@ -195,7 +195,8 @@ class MainActivity : AppCompatActivity() {
       permissions.entries.forEach {
         Log.d("test006", "${it.key} = ${it.value}")
       }
-      if (permissions.all { it.value } || permissions[Manifest.permission.BLUETOOTH_ADMIN]!!) {
+      if (permissions.filter { it.key != Manifest.permission.BLUETOOTH_ADMIN }
+          .all { it.value } || permissions[Manifest.permission.BLUETOOTH_ADMIN] == true) {
         startBle()
       } else {
         Toast.makeText(this, "Not every permission granted, check logs", Toast.LENGTH_SHORT).show()
@@ -203,12 +204,6 @@ class MainActivity : AppCompatActivity() {
     }
 
   fun startBle() {
-    val adapter = (getSystemService(BLUETOOTH_SERVICE) as BluetoothManager).adapter
-    if (!adapter.isBleOn) {
-      val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
-      requestBluetooth.launch(enableBtIntent)
-      return
-    }
 
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
       if (ContextCompat.checkSelfPermission(
@@ -224,14 +219,15 @@ class MainActivity : AppCompatActivity() {
       }
     } else {
       if (ContextCompat.checkSelfPermission(
-          this, Manifest.permission.BLUETOOTH_ADMIN
+          this, Manifest.permission.BLUETOOTH_ADVERTISE
         ) != PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
           this, Manifest.permission.BLUETOOTH_CONNECT
+        ) != PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
+          this, Manifest.permission.BLUETOOTH_SCAN
         ) != PackageManager.PERMISSION_GRANTED
       ) {
         requestMultiplePermissions.launch(
           arrayOf(
-            Manifest.permission.BLUETOOTH_ADMIN,
             Manifest.permission.BLUETOOTH_ADVERTISE,
             Manifest.permission.BLUETOOTH_SCAN,
             Manifest.permission.BLUETOOTH_CONNECT
@@ -240,6 +236,12 @@ class MainActivity : AppCompatActivity() {
 
         return
       }
+    }
+    val adapter = (getSystemService(BLUETOOTH_SERVICE) as BluetoothManager).adapter
+    if (!adapter.isBleOn) {
+      val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+      requestBluetooth.launch(enableBtIntent)
+      return
     }
 
     if (ContextCompat.checkSelfPermission(

@@ -11,8 +11,8 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
 import android.os.ParcelUuid
+import android.util.Base64
 import android.util.Log
-import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import com.cstef.meshlink.util.BleUuid
 import com.cstef.meshlink.util.struct.Chunk
@@ -78,7 +78,6 @@ class ServerBleManager(
 
   private val serverCallback = object : BluetoothGattServerCallback() {
 
-    @RequiresApi(Build.VERSION_CODES.O)
     @SuppressLint("MissingPermission")
     override fun onCharacteristicReadRequest(
       device: BluetoothDevice?,
@@ -105,7 +104,8 @@ class ServerBleManager(
             if (userId != null) {
               val data = moshi.packToByteArray(
                 KeyData(
-                  Base64.getEncoder().encodeToString(encryptionManager.publicKey.encoded), userId!!
+                  Base64.encodeToString(encryptionManager.publicKey.encoded, Base64.DEFAULT),
+                  userId!!
                 )
               )
               gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, data)

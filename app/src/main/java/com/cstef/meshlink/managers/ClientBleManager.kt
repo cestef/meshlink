@@ -12,9 +12,9 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
 import android.os.ParcelUuid
+import android.util.Base64
 import android.util.Log
 import android.widget.Toast
-import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -65,17 +65,13 @@ class ClientBleManager(
     ScanFilter.Builder().setServiceUuid(ParcelUuid.fromString(BleUuid.SERVICE_UUID)).build()
       .let { listOf(it) }
 
-  private val scanSettings = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+  private val scanSettings =
     ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)
       .setNumOfMatches(ScanSettings.MATCH_NUM_ONE_ADVERTISEMENT)
       .setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE).build()
-  } else {
-    TODO("VERSION.SDK_INT < M")
-  }
 
   private val scanCallback = object : ScanCallback() {
     @SuppressLint("MissingPermission")
-    @RequiresApi(Build.VERSION_CODES.M)
     override fun onScanResult(callbackType: Int, result: ScanResult?) {
       super.onScanResult(callbackType, result)
       val device = result?.device ?: return
@@ -191,54 +187,6 @@ class ClientBleManager(
       }
     }
 
-    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-    @SuppressLint("MissingPermission")
-    override fun onCharacteristicRead(
-      gatt: BluetoothGatt,
-      characteristic: BluetoothGattCharacteristic,
-      value: ByteArray,
-      status: Int
-    ) {
-      super.onCharacteristicRead(gatt, characteristic, value, status)
-      Log.d("ClientBleManager", "onCharacteristicRead: ${characteristic.uuid}")
-      operationQueue.operationComplete()
-      if (status == BluetoothGatt.GATT_SUCCESS) {
-        when (characteristic.uuid?.toString()) {
-          BleUuid.USER_ID_UUID -> {
-            val userId = value.toString(Charsets.UTF_8)
-            Log.d(
-              "ClientBleManager", "onCharacteristicRead: userId = $userId"
-            )
-            connectedServersIds[userId] = gatt.device.address
-            operationQueue.execute { gatt.readPublicKey() }
-
-            callbackHandler.post {
-              dataExchangeManager.onUserConnected(userId)
-            }
-          }
-          BleUuid.USER_PUBLIC_KEY_UUID -> {
-            val msg = moshi.unpack<KeyData>(value)
-            Log.d("ClientBleManager", "onCharacteristicRead: msg.key = ${msg.key}")
-            val publicKey = KeyFactory.getInstance("RSA")
-              .generatePublic(X509EncodedKeySpec(Base64.getDecoder().decode(msg.key)))
-            Log.d(
-              "ClientBleManager", "onCharacteristicRead: publicKey = $publicKey"
-            )
-            callbackHandler.post {
-              dataExchangeManager.onUserPublicKeyReceived(
-                msg.userId, publicKey
-              )
-            }
-          }
-        }
-
-      } else {
-        Log.e("ClientBleManager", "onCharacteristicRead: failed to read characteristic")
-        gatt.disconnect()
-      }
-    }
-
-    @RequiresApi(Build.VERSION_CODES.O)
     @SuppressLint("MissingPermission")
     @Suppress("DEPRECATION")
     @Deprecated("Use onCharacteristicRead instead")
@@ -269,7 +217,7 @@ class ClientBleManager(
             val msg = moshi.unpack<KeyData>(characteristic.value)
             Log.d("ClientBleManager", "onCharacteristicRead: msg.key = ${msg.key}")
             val publicKey = KeyFactory.getInstance("RSA")
-              .generatePublic(X509EncodedKeySpec(Base64.getDecoder().decode(msg.key)))
+              .generatePublic(X509EncodedKeySpec(Base64.decode(msg.key, Base64.DEFAULT)))
             Log.d(
               "ClientBleManager",
               "onCharacteristicRead: publicKey = $publicKey gatt == null: ${gatt == null}"
@@ -342,7 +290,9 @@ class ClientBleManager(
     if (adapter.isBleOn) {
       if (ActivityCompat.checkSelfPermission(
           context, Manifest.permission.BLUETOOTH_SCAN
-        ) == PackageManager.PERMISSION_GRANTED || (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && ActivityCompat.checkSelfPermission(
+        ) == PackageManager.PERMISSION_GRANTED
+        ||
+        (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && ActivityCompat.checkSelfPermission(
           context, Manifest.permission.BLUETOOTH_ADMIN
         ) == PackageManager.PERMISSION_GRANTED)
       ) {
@@ -453,7 +403,8 @@ class ClientBleManager(
         )
       } else {
         characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
-        @Suppress("DEPRECATION") characteristic.value = chunk.toByteArray()
+        @Suppress("DEPRECATION")
+        characteristic.value = chunk.toByteArray()
         @Suppress("DEPRECATION") writeCharacteristic(characteristic)
       }
       Log.d("ClientBleManager", "writeData: chunk ${chunk.index + 1} written")

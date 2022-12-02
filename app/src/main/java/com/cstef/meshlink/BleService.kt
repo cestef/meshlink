@@ -167,7 +167,6 @@ class BleService : Service() {
       }
     }
 
-    @RequiresApi(Build.VERSION_CODES.N)
     override fun onUserDisconnected(userId: String) {
       Log.d("MainViewModel", "onUserDisconnected: $userId")
       connectedDevices.map { it.id }.indexOf(userId).let {
