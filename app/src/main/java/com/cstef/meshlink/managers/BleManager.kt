@@ -75,7 +75,7 @@ class BleManager(
   }
 
   fun sendData(message: Message) {
-    val deviceAddress = clientManager.connectedServersIds[message.recipientId]
+    val deviceAddress = clientManager.connectedServersAddresses[message.recipientId]
     if (deviceAddress != null && clientManager.connectedGattServers.containsKey(deviceAddress)) {
       Log.d(tag, clientManager.connectedGattServers[deviceAddress]?.device?.address!!)
       Log.d(tag, "Sending data to ${message.recipientId}")
@@ -91,6 +91,19 @@ class BleManager(
       } else {
         Log.e(tag, "Cannot broadcast other than text messages")
       }
+    }
+  }
+
+  fun getUserIdForAddress(address: String): String? {
+    Log.d(tag, "Getting user id for address $address, connected servers: ${clientManager.connectedServersAddresses}")
+    return clientManager.connectedServersAddresses.entries.find { it.value == address }?.key
+  }
+
+  fun sendIsWriting(userId: String, writing: Boolean) {
+    val deviceAddress = clientManager.connectedServersAddresses[userId]
+    if (deviceAddress != null && clientManager.connectedGattServers.containsKey(deviceAddress)) {
+      Log.d(tag, "Sending isWriting to $userId")
+      clientManager.sendIsWriting(userId, writing)
     }
   }
 
@@ -119,5 +132,7 @@ class BleManager(
     fun getPublicKeyForUser(recipientId: String): PublicKey?
     fun onUserRssiReceived(userId: String, rssi: Int) {}
     fun onMessageSent(userId: String) {}
+    fun onUserWriting(userId: String, isWriting: Boolean) {}
+    fun getUserIdForAddress(address: String): String? = ""
   }
 }

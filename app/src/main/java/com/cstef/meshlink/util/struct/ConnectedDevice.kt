@@ -8,16 +8,18 @@ data class ConnectedDevice(
   val name: String?,
   var rssi: Int,
   var connected: Boolean,
-  var lastSeen: Long
+  var lastSeen: Long,
+  var writing: Boolean = false
 ) : java.io.Serializable, Parcelable {
+
   constructor(parcel: Parcel) : this(
     parcel.readString()!!,
     parcel.readString(),
     parcel.readInt(),
     parcel.readByte() != 0.toByte(),
-    parcel.readLong()
-  ) {
-  }
+    parcel.readLong(),
+    parcel.readByte() != 0.toByte()
+  )
 
   override fun writeToParcel(parcel: Parcel, flags: Int) {
     parcel.writeString(id)
@@ -25,6 +27,7 @@ data class ConnectedDevice(
     parcel.writeInt(rssi)
     parcel.writeByte(if (connected) 1 else 0)
     parcel.writeLong(lastSeen)
+    parcel.writeByte(if (writing) 1 else 0)
   }
 
   override fun describeContents(): Int {

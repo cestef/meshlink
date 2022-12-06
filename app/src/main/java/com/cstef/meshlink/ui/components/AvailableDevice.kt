@@ -63,6 +63,13 @@ fun AvailableDevice(device: ConnectedDevice, onClick: (deviceId: String) -> Unit
           else Icons.Rounded.SignalWifiStatusbarConnectedNoInternet4,
           contentDescription = "Signal strength",
         )
+        if (device.writing) {
+          Icon(
+            imageVector = Icons.Rounded.BluetoothSearching,
+            contentDescription = "Writing",
+            modifier = Modifier.padding(start = 8.dp)
+          )
+        }
       }
     }
   }

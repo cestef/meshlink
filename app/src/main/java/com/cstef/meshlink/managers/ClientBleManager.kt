@@ -46,7 +46,7 @@ class ClientBleManager(
   // references of the connected servers are kept so they can by manually
   // disconnected if this manager is stopped
   val connectedGattServers = mutableMapOf<String, BluetoothGatt>()
-  val connectedServersIds = mutableMapOf<String, String>()
+  val connectedServersAddresses = mutableMapOf<String, String>()
 
   data class ChunkSendingState(
     var chunksSent: Int,
@@ -78,7 +78,7 @@ class ClientBleManager(
       operationQueue.execute {
         if (connectedGattServers.containsKey(device.address)) {
           result.rssi.let { rssi ->
-            val userId = connectedServersIds.entries.find { it.value == device.address }?.key
+            val userId = connectedServersAddresses.entries.find { it.value == device.address }?.key
             if (userId != null) {
               callbackHandler.post { dataExchangeManager.onUserRssiReceived(userId, rssi) }
             } else {
@@ -114,9 +114,9 @@ class ClientBleManager(
                 )
                 connectedGattServers.remove(gatt.device.address)
                 val serverId =
-                  connectedServersIds.entries.find { it.value == gatt.device.address }?.key
+                  connectedServersAddresses.entries.find { it.value == gatt.device.address }?.key
                 if (serverId != null) {
-                  connectedServersIds.remove(serverId)
+                  connectedServersAddresses.remove(serverId)
                   dataExchangeManager.onUserDisconnected(serverId)
                 }
                 gatt.close()
@@ -125,9 +125,9 @@ class ClientBleManager(
                 Log.d("ClientBleManager", "onConnectionStateChange: disconnecting")
                 connectedGattServers.remove(gatt.device.address)
                 val serverId =
-                  connectedServersIds.entries.find { it.value == gatt.device.address }?.key
+                  connectedServersAddresses.entries.find { it.value == gatt.device.address }?.key
                 if (serverId != null) {
-                  connectedServersIds.remove(serverId)
+                  connectedServersAddresses.remove(serverId)
                   dataExchangeManager.onUserDisconnected(serverId)
                 }
                 gatt.disconnect()
@@ -148,10 +148,10 @@ class ClientBleManager(
           if (gatt != null) {
             Log.i(
               "ClientBleManager",
-              "onConnectionStateChange: disconnected from ${connectedServersIds[gatt.device.address]}"
+              "onConnectionStateChange: disconnected from ${connectedServersAddresses[gatt.device.address]}"
             )
             connectedGattServers.remove(gatt.device.address)
-            connectedServersIds.remove(gatt.device.address)
+            connectedServersAddresses.remove(gatt.device.address)
             gatt.close()
           }
         }
@@ -206,7 +206,7 @@ class ClientBleManager(
             )
 
             if (gatt != null) {
-              connectedServersIds[userId] = gatt.device.address
+              connectedServersAddresses[userId] = gatt.device.address
               operationQueue.execute { gatt.readPublicKey() }
             }
             callbackHandler.post {
@@ -416,7 +416,7 @@ class ClientBleManager(
 
   fun broadcastData(message: Message) {
     val bleData = BleData.fromMessage(message)
-    connectedGattServers.values.filter { connectedServersIds.entries.find { entry -> entry.value == it.device.address }?.key != message.senderId }
+    connectedGattServers.values.filter { connectedServersAddresses.entries.find { entry -> entry.value == it.device.address }?.key != message.senderId }
       .forEach {
         it.writeData(bleData)
       }
@@ -424,11 +424,35 @@ class ClientBleManager(
 
   fun sendData(message: Message) {
     val bleData = BleData.fromMessage(message)
-    val deviceAddress = connectedServersIds[message.recipientId]
+    val deviceAddress = connectedServersAddresses[message.recipientId]
     if (deviceAddress != null) {
       connectedGattServers[deviceAddress]?.writeData(bleData)
     } else {
       Log.w("ClientBleManager", "sendData: deviceAddress is null")
+    }
+  }
+
+  @SuppressLint("MissingPermission")
+  @Suppress("DEPRECATION")
+  fun sendIsWriting(userId: String, writing: Boolean) {
+    val deviceAddress = connectedServersAddresses[userId]
+    val server = deviceAddress?.let { connectedGattServers[it] }
+    if (server != null) {
+      val characteristic =
+        server.getService(UUID.fromString(BleUuid.SERVICE_UUID))?.getCharacteristic(
+          UUID.fromString(
+            BleUuid.USER_WRITING_UUID
+          )
+        )
+      if (characteristic != null) {
+        characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+        characteristic.value = moshi.packToByteArray(WritingData(userId, writing))
+        server.writeCharacteristic(characteristic)
+      } else {
+        Log.w("ClientBleManager", "sendIsWriting: characteristic is null")
+      }
+    } else {
+      Log.w("ClientBleManager", "sendIsWriting: server is null")
     }
   }
 }

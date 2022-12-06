@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
@@ -24,6 +25,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.cstef.meshlink.ui.theme.DarkColors
+import com.cstef.meshlink.ui.theme.LightColors
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -64,6 +67,8 @@ fun ImageCard(isMine: Boolean, content: String) {
             Icon(
               imageVector = Icons.Rounded.Close,
               contentDescription = "Close",
+              modifier = Modifier.size(24.dp),
+              tint = if (isSystemInDarkTheme()) DarkColors.onSurface else LightColors.onSurface
             )
           }
           IconButton(onClick = {
@@ -76,6 +81,8 @@ fun ImageCard(isMine: Boolean, content: String) {
             Icon(
               imageVector = Icons.Rounded.Share,
               contentDescription = "Share",
+              modifier = Modifier.size(24.dp),
+              tint = if (isSystemInDarkTheme()) DarkColors.onSurface else LightColors.onSurface
             )
           }
           Image(

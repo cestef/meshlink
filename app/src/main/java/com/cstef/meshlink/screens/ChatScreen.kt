@@ -2,6 +2,7 @@ package com.cstef.meshlink.screens
 
 import android.graphics.RectF
 import android.util.Base64
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
@@ -32,7 +33,7 @@ import com.cstef.meshlink.util.struct.Message
 fun ChatScreen(
   bleBinder: BleService.BleServiceBinder?,
   deviceId: String?,
-  onBack: () -> Unit,
+  myUserId: String,
 ) {
   Column(
     modifier = Modifier
@@ -61,7 +62,9 @@ fun ChatScreen(
       Messages(
         Modifier
           .weight(1f)
-          .fillMaxSize(), bleBinder, deviceId
+          .fillMaxSize(), bleBinder,
+        deviceId,
+        myUserId
       )
       SendMessage(bleBinder, deviceId)
     }
@@ -114,7 +117,10 @@ fun Avatar(deviceId: String, modifier: Modifier = Modifier.size(48.dp)) {
 
 @Composable
 fun Messages(
-  modifier: Modifier = Modifier, bleBinder: BleService.BleServiceBinder, deviceId: String
+  modifier: Modifier = Modifier,
+  bleBinder: BleService.BleServiceBinder,
+  deviceId: String,
+  myUserId: String
 ) {
   val messages = remember { mutableStateListOf<Message>() }
   val (hasNewMessage, setHasNewMessage) = remember { mutableStateOf(false) }
@@ -140,6 +146,31 @@ fun Messages(
     messages.addAll(newMessages)
     if (newMessages.isNotEmpty()) {
       setHasNewMessage(true)
+    }
+  }
+  SystemBroadcastReceiver(BleService.ACTION_USER.action!!) {
+    // If the user is writing a message, display it
+    val connectedDevices = bleBinder.getConnectedDevices()
+    val writingMessage = Message(
+      deviceId,
+      myUserId,
+      "...",
+      Message.Type.TEXT,
+      System.currentTimeMillis(),
+      false
+    )
+    if (connectedDevices.any { it.id == deviceId && it.writing }) {
+      Log.d("ChatScreen", "User is writing a message")
+      if (!messages.contains(writingMessage)) {
+        messages.add(writingMessage)
+        setHasNewMessage(true)
+      }
+    } else {
+      // If the user is not writing a message, remove the message
+      if (messages.contains(writingMessage)) {
+        messages.remove(writingMessage)
+        setHasNewMessage(true)
+      }
     }
   }
   LazyColumn(
@@ -185,7 +216,10 @@ fun SendMessage(bleBinder: BleService.BleServiceBinder, deviceId: String) {
   ) {
     OutlinedTextField(
       value = text,
-      onValueChange = { setText(it) },
+      onValueChange = {
+        setText(it)
+        bleBinder.sendIsWriting(deviceId, it.isNotEmpty())
+      },
       label = { Text("Message") },
       modifier = Modifier
         .weight(1f)
@@ -197,8 +231,7 @@ fun SendMessage(bleBinder: BleService.BleServiceBinder, deviceId: String) {
           Icon(Icons.Filled.AttachFile, contentDescription = "Attach file")
         }
       },
-
-      )
+    )
     FloatingActionButton(
       onClick = {
         if (text.isNotEmpty()) {

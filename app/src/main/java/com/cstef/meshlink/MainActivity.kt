@@ -22,9 +22,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.rounded.Add
@@ -81,12 +79,26 @@ class MainActivity : AppCompatActivity() {
   @Composable
   private fun LoadingScreen() {
     AppTheme {
-      Box(
+      Column(
         modifier = Modifier
           .fillMaxSize()
-          .background(if (isSystemInDarkTheme()) DarkColors.background else LightColors.background)
+          .background(if (isSystemInDarkTheme()) DarkColors.background else LightColors.background),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
       ) {
-        CircularProgressIndicator()
+        Row(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.Center
+        ) {
+          Text(
+            text = "MeshLink",
+            style = MaterialTheme.typography.headlineLarge,
+            color = if (isSystemInDarkTheme()) DarkColors.onBackground else LightColors.onBackground,
+          )
+        }
       }
     }
   }
@@ -149,10 +161,8 @@ class MainActivity : AppCompatActivity() {
             arguments = listOf(navArgument("deviceId") { type = NavType.StringType })
           ) { backStackEntry ->
             ChatScreen(
-              bleBinder, backStackEntry.arguments?.getString("deviceId")
-            ) {
-              navController.popBackStack()
-            }
+              bleBinder, backStackEntry.arguments?.getString("deviceId"), userId
+            )
           }
           composable("add") {
             AddDeviceScreen(bleBinder, userId) {
@@ -246,13 +256,13 @@ class MainActivity : AppCompatActivity() {
 
     if (ContextCompat.checkSelfPermission(
         this, Manifest.permission.ACCESS_COARSE_LOCATION
-      ) != PackageManager.PERMISSION_GRANTED && ContextCompat.checkSelfPermission(
+      ) != PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
         this, Manifest.permission.ACCESS_FINE_LOCATION
       ) != PackageManager.PERMISSION_GRANTED
     ) {
       requestMultiplePermissions.launch(
         arrayOf(
-          Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION
+          Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION
         )
       )
       return

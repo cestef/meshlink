@@ -17,6 +17,7 @@ import androidx.core.app.ActivityCompat
 import com.cstef.meshlink.util.BleUuid
 import com.cstef.meshlink.util.struct.Chunk
 import com.cstef.meshlink.util.struct.KeyData
+import com.cstef.meshlink.util.struct.WritingData
 import com.daveanthonythomas.moshipack.MoshiPack
 import java.util.*
 
@@ -56,6 +57,11 @@ class ServerBleManager(
     BluetoothGattCharacteristic.PROPERTY_READ,
     BluetoothGattCharacteristic.PERMISSION_READ
   )
+  private val userWritingCharacteristic = BluetoothGattCharacteristic(
+    UUID.fromString(BleUuid.USER_WRITING_UUID),
+    BluetoothGattCharacteristic.PROPERTY_WRITE,
+    BluetoothGattCharacteristic.PERMISSION_WRITE
+  )
 
   private val bleService = BluetoothGattService(
     UUID.fromString(BleUuid.SERVICE_UUID), BluetoothGattService.SERVICE_TYPE_PRIMARY
@@ -64,6 +70,7 @@ class ServerBleManager(
     addCharacteristic(userIdCharacteristic)
     addCharacteristic(userNameCharacteristic)
     addCharacteristic(userPublicKeyCharacteristic)
+    addCharacteristic(userWritingCharacteristic)
   }
 
   private val advertiseSettings =
@@ -130,28 +137,44 @@ class ServerBleManager(
       super.onCharacteristicWriteRequest(
         device, requestId, characteristic, preparedWrite, responseNeeded, offset, value
       )
-      callbackHandler.post {
-        try {
-          val chunk = value?.let { Chunk.fromByteArray(it) }
-          device?.address?.let {
-            if (chunk != null) {
-              dataExchangeManager.onChunkReceived(chunk, it)
+      when (characteristic?.uuid.toString()) {
+        BleUuid.WRITE_UUID -> {
+          callbackHandler.post {
+            try {
+              val chunk = value?.let { Chunk.fromByteArray(it) }
+              device?.address?.let {
+                if (chunk != null) {
+                  dataExchangeManager.onChunkReceived(chunk, it)
+                }
+              }
+              if (responseNeeded) {
+                gattServer?.sendResponse(
+                  device, requestId, BluetoothGatt.GATT_SUCCESS, offset, null
+                )
+              }
+            } catch (e: Exception) {
+              Log.e("ServerBleManager", "onCharacteristicWriteRequest: ", e)
+              if (responseNeeded) {
+                gattServer?.sendResponse(
+                  device, requestId, BluetoothGatt.GATT_FAILURE, offset, null
+                )
+              }
             }
-          }
-          if (responseNeeded) {
-            gattServer?.sendResponse(
-              device, requestId, BluetoothGatt.GATT_SUCCESS, offset, null
-            )
-          }
-        } catch (e: Exception) {
-          Log.e("ServerBleManager", "onCharacteristicWriteRequest: ", e)
-          if (responseNeeded) {
-            gattServer?.sendResponse(
-              device, requestId, BluetoothGatt.GATT_FAILURE, offset, null
-            )
+
           }
         }
-
+        BleUuid.USER_WRITING_UUID -> {
+          val writingData = moshi.unpack<WritingData>(value!!)
+          Log.d("ServerBleManager", "onCharacteristicWriteRequest: $writingData")
+          if (userId != null) {
+            callbackHandler.post {
+              dataExchangeManager.onUserWriting(
+                writingData.userId,
+                writingData.isWriting
+              )
+            }
+          }
+        }
       }
     }
   }

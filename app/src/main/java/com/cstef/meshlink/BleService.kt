@@ -1,12 +1,12 @@
 package com.cstef.meshlink
 
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.os.*
 import android.util.Log
 import android.widget.Toast
-import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import com.cstef.meshlink.managers.BleManager
 import com.cstef.meshlink.managers.EncryptionManager
@@ -58,6 +58,13 @@ class BleService : Service() {
     fun addDevice(userId: String) {
       bleDataExchangeManager.onUserConnected(userId)
     }
+    fun sendIsWriting(userId: String, isWriting: Boolean) {
+      this@BleService.sendIsWriting(userId, isWriting)
+    }
+  }
+
+  private fun sendIsWriting(userId: String, writing: Boolean) {
+    bleManager.sendIsWriting(userId, writing)
   }
 
   private val connectedDevices = mutableListOf<ConnectedDevice>()
@@ -100,6 +107,7 @@ class BleService : Service() {
     }
 
     override fun onChunkReceived(chunk: Chunk, address: String) {
+      Log.d("BleService", "onChunkReceived: $address")
       Log.d(
         "BleService",
         "onChunkReceived: chunk.index: ${chunk.index}, chunk.data.size: ${chunk.data.size}"
@@ -138,6 +146,13 @@ class BleService : Service() {
           )
           // Send notification to user phone
           val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+          // Go to the chat screen when the user clicks on the notification
+          val clickIntent = Intent(this@BleService, MainActivity::class.java)
+          clickIntent.putExtra("userId", bleData.senderId)
+          val pendingIntent = PendingIntent.getActivity(
+            this@BleService, 0, clickIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+          )
           val notification = NotificationCompat.Builder(this@BleService, "messages")
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("MeshLink")
@@ -150,7 +165,9 @@ class BleService : Service() {
                 }
               }"
             )
+            .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setContentIntent(pendingIntent)
             .build()
           notificationManager.notify(
             newMessage.senderId.hashCode(), notification
@@ -188,7 +205,17 @@ class BleService : Service() {
     override fun onUserRssiReceived(userId: String, rssi: Int) {
       connectedDevices.find { it.id == userId }?.rssi = rssi
       val intent = Intent(ACTION_USER)
-      intent.putParcelableArrayListExtra(EXTRA_DEVICES, connectedDevices.toCollection(ArrayList()))
+      sendBroadcast(intent)
+    }
+
+    override fun getUserIdForAddress(address: String): String? {
+      return bleManager.getUserIdForAddress(address)
+    }
+
+    override fun onUserWriting(userId: String, isWriting: Boolean) {
+      Log.d("BleService", "onUserWriting: $userId, $isWriting")
+      connectedDevices.find { it.id == userId }?.writing = isWriting
+      val intent = Intent(ACTION_USER)
       sendBroadcast(intent)
     }
   }
