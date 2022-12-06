@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: November 30, 2022
+Last updated: December 6, 2022
 
 # Data Collection
 
