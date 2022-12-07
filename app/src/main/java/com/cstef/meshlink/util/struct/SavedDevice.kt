@@ -3,7 +3,7 @@ package com.cstef.meshlink.util.struct
 import android.os.Parcel
 import android.os.Parcelable
 
-data class ConnectedDevice(
+data class SavedDevice(
   val id: String,
   val name: String?,
   var rssi: Int,
@@ -34,12 +34,12 @@ data class ConnectedDevice(
     return 0
   }
 
-  companion object CREATOR : Parcelable.Creator<ConnectedDevice> {
-    override fun createFromParcel(parcel: Parcel): ConnectedDevice {
-      return ConnectedDevice(parcel)
+  companion object CREATOR : Parcelable.Creator<SavedDevice> {
+    override fun createFromParcel(parcel: Parcel): SavedDevice {
+      return SavedDevice(parcel)
     }
 
-    override fun newArray(size: Int): Array<ConnectedDevice?> {
+    override fun newArray(size: Int): Array<SavedDevice?> {
       return arrayOfNulls(size)
     }
   }

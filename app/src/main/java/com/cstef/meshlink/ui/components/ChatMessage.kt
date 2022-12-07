@@ -6,7 +6,10 @@ import com.cstef.meshlink.util.struct.Message
 
 @Composable
 fun ChatMessage(type: String, content: String, timestamp: Long, isMine: Boolean) {
-  Log.d("ChatMessage", "type: $type, content: $content, timestamp: $timestamp, isMine: $isMine")
+  Log.d(
+    "ChatMessage",
+    "type: $type, content: ${if (type == Message.Type.TEXT) content else "Binary data"}, timestamp: $timestamp, isMine: $isMine"
+  )
   when (type) {
     Message.Type.TEXT -> {
       TextCard(isMine, content)

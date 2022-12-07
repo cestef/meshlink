@@ -2,10 +2,11 @@ package com.cstef.meshlink.screens
 
 import android.graphics.RectF
 import android.util.Base64
-import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,6 +16,7 @@ import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -23,7 +25,8 @@ import androidx.compose.ui.unit.dp
 import com.caverock.androidsvg.SVG
 import com.cstef.meshlink.BleService
 import com.cstef.meshlink.ui.components.ChatMessage
-import com.cstef.meshlink.util.SystemBroadcastReceiver
+import com.cstef.meshlink.ui.theme.DarkColors
+import com.cstef.meshlink.ui.theme.LightColors
 import com.cstef.meshlink.util.generateBeamSVG
 import com.cstef.meshlink.util.struct.Message
 
@@ -31,40 +34,83 @@ import com.cstef.meshlink.util.struct.Message
 @ExperimentalMaterial3Api
 @Composable
 fun ChatScreen(
-  bleBinder: BleService.BleServiceBinder?,
+  bleBinder: BleService.BleServiceBinder,
   deviceId: String?,
-  myUserId: String,
+  onUserClick: (String) -> Unit,
 ) {
+  val devices by bleBinder.allDevices.observeAsState(listOf())
+  val device = devices.find { it.userId == deviceId }
   Column(
     modifier = Modifier
       .fillMaxSize()
   ) {
-    if (bleBinder != null && deviceId != null) {
+    if (deviceId != null) {
       TopAppBar(title = {
         Row(modifier = Modifier.fillMaxWidth()) {
           Avatar(
             deviceId = deviceId,
             modifier = Modifier
-              .padding(end = 16.dp, top = 16.dp, bottom = 16.dp)
+              .padding(start = 16.dp, top = 16.dp, bottom = 16.dp)
               .align(Alignment.CenterVertically)
-              .size(48.dp)
-          )
-          Text(
-            text = "$deviceId",
+              .size(64.dp)
+          ) {
+            // Open device info screen
+            onUserClick(deviceId)
+          }
+          Column(
             modifier = Modifier
               .padding(top = 16.dp, bottom = 16.dp, start = 24.dp)
               .align(
                 Alignment.CenterVertically
               )
-          )
+          ) {
+            Text(
+              text = deviceId,
+              style = MaterialTheme.typography.titleLarge,
+              color = if (isSystemInDarkTheme()) DarkColors.onSurface else LightColors.onSurface
+            )
+            if (device?.blocked == true) {
+              Text(
+                text = "Blocked",
+                modifier = Modifier
+                  .padding(top = 8.dp)
+                  .align(
+                    Alignment.CenterHorizontally
+                  ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (isSystemInDarkTheme()) DarkColors.error else LightColors.error
+              )
+            } else if (device?.connected == true) {
+              Text(
+                text = "Connected",
+                modifier = Modifier
+                  .padding(top = 8.dp)
+                  .align(
+                    Alignment.CenterHorizontally
+                  ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (isSystemInDarkTheme()) DarkColors.onBackground else LightColors.onBackground
+              )
+            } else {
+              Text(
+                text = "Disconnected",
+                modifier = Modifier
+                  .padding(top = 8.dp)
+                  .align(
+                    Alignment.CenterHorizontally
+                  ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (isSystemInDarkTheme()) DarkColors.error else LightColors.error
+              )
+            }
+          }
         }
       }, modifier = Modifier.height(96.dp))
       Messages(
         Modifier
           .weight(1f)
           .fillMaxSize(), bleBinder,
-        deviceId,
-        myUserId
+        deviceId
       )
       SendMessage(bleBinder, deviceId)
     }
@@ -72,8 +118,16 @@ fun ChatScreen(
 }
 
 @Composable
-fun Avatar(deviceId: String, modifier: Modifier = Modifier.size(48.dp)) {
-  Canvas(modifier = modifier) {
+fun Avatar(
+  deviceId: String,
+  modifier: Modifier = Modifier,
+  onClick: (() -> Unit)? = null
+) {
+  Canvas(modifier = if (onClick != null) (
+    modifier
+      .clickable { onClick() }
+    ) else modifier
+  ) {
     drawIntoCanvas { canvas ->
       val svgString = generateBeamSVG(
         deviceId,
@@ -112,65 +166,23 @@ fun Avatar(deviceId: String, modifier: Modifier = Modifier.size(48.dp)) {
       svg.renderToCanvas(canvas.nativeCanvas)
     }
   }
-
 }
 
 @Composable
 fun Messages(
   modifier: Modifier = Modifier,
   bleBinder: BleService.BleServiceBinder,
-  deviceId: String,
-  myUserId: String
+  deviceId: String
 ) {
-  val messages = remember { mutableStateListOf<Message>() }
+  val messages by bleBinder.allMessages.observeAsState(listOf())
   val (hasNewMessage, setHasNewMessage) = remember { mutableStateOf(false) }
   val scrollState = rememberLazyListState()
   // on first composition, get the messages from the bleBinder
-  LaunchedEffect(Unit) {
-    val newMessages = bleBinder.getMessages(deviceId)
-    messages.addAll(newMessages)
-    if (newMessages.isNotEmpty()) {
-      setHasNewMessage(true)
-    }
-  }
   if (hasNewMessage) {
     LaunchedEffect(Unit) {
       // Scroll to the bottom of the list, not with scrollState.maxValue because the list is infinite
       scrollState.scrollToItem(messages.size - 1)
       setHasNewMessage(false)
-    }
-  }
-  SystemBroadcastReceiver(BleService.ACTION_MESSAGES.action!!) {
-    // Add only new messages
-    val newMessages = bleBinder.getMessages(deviceId).filter { !messages.contains(it) }
-    messages.addAll(newMessages)
-    if (newMessages.isNotEmpty()) {
-      setHasNewMessage(true)
-    }
-  }
-  SystemBroadcastReceiver(BleService.ACTION_USER.action!!) {
-    // If the user is writing a message, display it
-    val connectedDevices = bleBinder.getConnectedDevices()
-    val writingMessage = Message(
-      deviceId,
-      myUserId,
-      "...",
-      Message.Type.TEXT,
-      System.currentTimeMillis(),
-      false
-    )
-    if (connectedDevices.any { it.id == deviceId && it.writing }) {
-      Log.d("ChatScreen", "User is writing a message")
-      if (!messages.contains(writingMessage)) {
-        messages.add(writingMessage)
-        setHasNewMessage(true)
-      }
-    } else {
-      // If the user is not writing a message, remove the message
-      if (messages.contains(writingMessage)) {
-        messages.remove(writingMessage)
-        setHasNewMessage(true)
-      }
     }
   }
   LazyColumn(
@@ -181,13 +193,13 @@ fun Messages(
     state = scrollState
   ) {
     items(
-      messages
+      messages.filter { it.senderId == deviceId || it.recipientId == deviceId }
     ) { message ->
       ChatMessage(
         type = message.type,
         content = message.content,
         timestamp = message.timestamp,
-        isMine = message.isMe
+        isMine = message.senderId != deviceId
       )
     }
   }
@@ -218,7 +230,7 @@ fun SendMessage(bleBinder: BleService.BleServiceBinder, deviceId: String) {
       value = text,
       onValueChange = {
         setText(it)
-        bleBinder.sendIsWriting(deviceId, it.isNotEmpty())
+//        bleBinder.sendIsWriting(deviceId, it.isNotEmpty())
       },
       label = { Text("Message") },
       modifier = Modifier
@@ -231,6 +243,7 @@ fun SendMessage(bleBinder: BleService.BleServiceBinder, deviceId: String) {
           Icon(Icons.Filled.AttachFile, contentDescription = "Attach file")
         }
       },
+      singleLine = true,
     )
     FloatingActionButton(
       onClick = {

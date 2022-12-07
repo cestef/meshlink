@@ -9,10 +9,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -20,45 +18,30 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat.startActivity
 import com.cstef.meshlink.BleService
 import com.cstef.meshlink.ui.components.AvailableDevice
-import com.cstef.meshlink.util.SystemBroadcastReceiver
-import com.cstef.meshlink.util.struct.ConnectedDevice
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScanScreen(
-  bleBinder: BleService.BleServiceBinder?,
+  bleBinder: BleService.BleServiceBinder,
   userId: String,
+  onSelfClick: () -> Unit,
+  onDeviceLongClick: (deviceId: String) -> Unit,
   onDeviceSelected: (deviceId: String) -> Unit,
 ) {
-  val devices = remember {
-    mutableStateListOf<ConnectedDevice>()
-  }
+  val devices by bleBinder.allDevices.observeAsState()
   val context = LocalContext.current
-  LaunchedEffect(Unit) {
-    val connectedDevices = bleBinder?.getConnectedDevices() ?: emptyList()
-    val currentCopy = devices.toList()
-    devices.clear()
-    devices.addAll(connectedDevices)
-    devices.addAll(currentCopy.filter { !connectedDevices.contains(it) })
-  }
-  SystemBroadcastReceiver(BleService.ACTION_USER.action!!) {
-    val connectedDevices = bleBinder?.getConnectedDevices() ?: emptyList()
-    val currentCopy = devices.toList()
-    devices.clear()
-    devices.addAll(connectedDevices)
-    devices.addAll(currentCopy.filter { !connectedDevices.contains(it) })
-  }
   Column(modifier = Modifier.fillMaxSize()) {
     TopAppBar(title = {
       Row(modifier = Modifier.fillMaxWidth()) {
         Avatar(
           deviceId = userId, modifier = Modifier
-            .padding(16.dp)
+            .padding(start = 16.dp, top = 16.dp, bottom = 16.dp)
             .align(Alignment.CenterVertically)
-            .size(48.dp)
+            .size(64.dp),
+          onClick = onSelfClick
         )
         Text(
-          text = "$userId",
+          text = userId,
           modifier = Modifier
             .padding(top = 16.dp, bottom = 16.dp, start = 24.dp, end = 0.dp)
             .align(
@@ -98,9 +81,9 @@ fun ScanScreen(
     }, modifier = Modifier.height(96.dp))
     LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
       items(
-        devices
+        devices ?: listOf(),
       ) { device ->
-        AvailableDevice(device = device) { onDeviceSelected(it) }
+        AvailableDevice(device = device, { onDeviceLongClick(it) }) { onDeviceSelected(it) }
       }
     }
   }

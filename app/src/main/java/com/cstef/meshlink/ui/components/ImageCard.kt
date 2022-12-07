@@ -58,31 +58,36 @@ fun ImageCard(isMine: Boolean, content: String) {
         dismissOnBackPress = true, dismissOnClickOutside = false, usePlatformDefaultWidth = false
       ),
       content = {
-        Column(
-          modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally
+        Row(
+          modifier = Modifier.fillMaxSize(),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.SpaceBetween
         ) {
-          IconButton(onClick = {
-            setFullScreen(false)
-          }, modifier = Modifier.align(Alignment.Start)) {
+          IconButton(
+            onClick = { setFullScreen(false) },
+            modifier = Modifier.padding(8.dp)
+          ) {
             Icon(
               imageVector = Icons.Rounded.Close,
-              contentDescription = "Close",
-              modifier = Modifier.size(24.dp),
-              tint = if (isSystemInDarkTheme()) DarkColors.onSurface else LightColors.onSurface
+              contentDescription = null,
+              tint = if (isSystemInDarkTheme()) DarkColors.primary else LightColors.primary
             )
           }
-          IconButton(onClick = {
-            val intent = Intent(Intent.ACTION_SEND)
-            intent.type = "image/*"
-            intent.putExtra(Intent.EXTRA_STREAM, image)
-            intent.putExtra(Intent.EXTRA_TEXT, "Sent from MeshLink")
-            context.startActivity(Intent.createChooser(intent, "Share image"))
-          }, modifier = Modifier.align(Alignment.End)) {
+          IconButton(
+            onClick = {
+              val shareIntent = Intent().apply {
+                action = Intent.ACTION_SEND
+                putExtra(Intent.EXTRA_STREAM, image)
+                type = "image/*"
+              }
+              context.startActivity(Intent.createChooser(shareIntent, "Share image"))
+            },
+            modifier = Modifier.padding(8.dp)
+          ) {
             Icon(
               imageVector = Icons.Rounded.Share,
-              contentDescription = "Share",
-              modifier = Modifier.size(24.dp),
-              tint = if (isSystemInDarkTheme()) DarkColors.onSurface else LightColors.onSurface
+              contentDescription = null,
+              tint = if (isSystemInDarkTheme()) DarkColors.primary else LightColors.primary
             )
           }
           Image(

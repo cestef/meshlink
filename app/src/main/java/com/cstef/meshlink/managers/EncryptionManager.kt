@@ -133,4 +133,13 @@ class EncryptionManager {
     val md = MessageDigest.getInstance("MD5")
     return BigInteger(1, md.digest(input)).toString(16).padStart(32, '0')
   }
+
+  fun getPublicKeySignature(key: PublicKey): String {
+    // Generate a human readable signature for the public key, so that we can compare it visually
+    // with the signature of the other device
+    // Format: AAAA-BBBB-CCCC-DDDD-EEEE-FFFF-GGGG-HHHH (Hexadecimal)
+    val md = MessageDigest.getInstance("SHA-256")
+    md.update(key.encoded)
+    return md5(md.digest()).chunked(4).joinToString("-")
+  }
 }

@@ -74,7 +74,7 @@ class BleManager(
     isStarted.value = false
   }
 
-  fun sendData(message: Message) {
+  fun sendMessage(message: Message) {
     val deviceAddress = clientManager.connectedServersAddresses[message.recipientId]
     if (deviceAddress != null && clientManager.connectedGattServers.containsKey(deviceAddress)) {
       Log.d(tag, clientManager.connectedGattServers[deviceAddress]?.device?.address!!)
@@ -95,17 +95,32 @@ class BleManager(
   }
 
   fun getUserIdForAddress(address: String): String? {
-    Log.d(tag, "Getting user id for address $address, connected servers: ${clientManager.connectedServersAddresses}")
+    Log.d(
+      tag,
+      "Getting user id for address $address, connected servers: ${clientManager.connectedServersAddresses}"
+    )
     return clientManager.connectedServersAddresses.entries.find { it.value == address }?.key
   }
 
-  fun sendIsWriting(userId: String, writing: Boolean) {
-    val deviceAddress = clientManager.connectedServersAddresses[userId]
-    if (deviceAddress != null && clientManager.connectedGattServers.containsKey(deviceAddress)) {
-      Log.d(tag, "Sending isWriting to $userId")
-      clientManager.sendIsWriting(userId, writing)
-    }
+  fun disconnectAll() {
+    clientManager.disconnectAll()
   }
+
+  fun disconnect(userId: String) {
+    clientManager.disconnect(userId)
+  }
+
+//  fun sendIsWriting(userId: String, writing: Boolean) {
+//    val deviceAddress = clientManager.connectedServersAddresses[userId]
+//    if (deviceAddress != null && clientManager.connectedGattServers.containsKey(deviceAddress)) {
+//      Log.d(tag, "Sending isWriting to $userId")
+//      clientManager.sendIsWriting(userId, writing)
+//    }
+//  }
+
+//  fun isConnected(deviceId: String): Boolean {
+//    return clientManager.connectedServersAddresses.containsKey(deviceId)
+//  }
 
   /**
    * Methods used for swapping data between a remote BLE client or server
@@ -134,5 +149,6 @@ class BleManager(
     fun onMessageSent(userId: String) {}
     fun onUserWriting(userId: String, isWriting: Boolean) {}
     fun getUserIdForAddress(address: String): String? = ""
+    fun onMessageSendFailed(userId: String?, reason: String?) {}
   }
 }

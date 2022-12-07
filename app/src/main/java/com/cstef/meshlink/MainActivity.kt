@@ -43,6 +43,7 @@ import com.cstef.meshlink.managers.isBleOn
 import com.cstef.meshlink.screens.AddDeviceScreen
 import com.cstef.meshlink.screens.ChatScreen
 import com.cstef.meshlink.screens.ScanScreen
+import com.cstef.meshlink.screens.UserInfoScreen
 import com.cstef.meshlink.ui.theme.AppTheme
 import com.cstef.meshlink.ui.theme.DarkColors
 import com.cstef.meshlink.ui.theme.LightColors
@@ -120,53 +121,79 @@ class MainActivity : AppCompatActivity() {
         NavHost(navController = navController, startDestination = "scan") {
           composable("scan") {
             Box(modifier = Modifier.fillMaxSize()) {
-              ScanScreen(bleBinder, userId) { navController.navigate("chat/$it") }
-              // Manually add a device via its ID
-              FloatingActionButton(
-                onClick = {
-                  navController.navigate("add")
-                },
-                modifier = Modifier
-                  .align(Alignment.BottomStart)
-                  .padding(24.dp)
-              ) {
-                Icon(
-                  imageVector = Icons.Rounded.Add,
-                  contentDescription = "Add device",
+              if (bleBinder != null) {
+                ScanScreen(
+                  bleBinder!!,
+                  userId,
+                  { navController.navigate("user/$userId") },
+                  { navController.navigate("user/$it") },
+                  { navController.navigate("chat/$it") }
+                )
+                // Manually add a device via its ID
+                FloatingActionButton(
+                  onClick = {
+                    navController.navigate("add")
+                  },
+                  modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(24.dp)
+                ) {
+                  Icon(
+                    imageVector = Icons.Rounded.Add,
+                    contentDescription = "Add device",
+                  )
+                }
+                ExtendedFloatingActionButton(
+                  onClick = {
+                    if (started) {
+                      stopBle()
+                    } else {
+                      startBle()
+                    }
+                  },
+                  icon = {
+                    Icon(
+                      imageVector = if (started) Icons.Rounded.Close else Icons.Filled.PlayArrow,
+                      contentDescription = "Start/Stop"
+                    )
+                  },
+                  text = { Text(text = if (started) "Stop" else "Start") },
+                  modifier = Modifier
+                    .padding(24.dp)
+                    .align(Alignment.BottomEnd),
                 )
               }
-              ExtendedFloatingActionButton(
-                onClick = {
-                  if (started) {
-                    stopBle()
-                  } else {
-                    startBle()
-                  }
-                },
-                icon = {
-                  Icon(
-                    imageVector = if (started) Icons.Rounded.Close else Icons.Filled.PlayArrow,
-                    contentDescription = "Start/Stop"
-                  )
-                },
-                text = { Text(text = if (started) "Stop" else "Start") },
-                modifier = Modifier
-                  .padding(24.dp)
-                  .align(Alignment.BottomEnd),
-              )
             }
           }
           composable(
             "chat/{deviceId}",
             arguments = listOf(navArgument("deviceId") { type = NavType.StringType })
           ) { backStackEntry ->
-            ChatScreen(
-              bleBinder, backStackEntry.arguments?.getString("deviceId"), userId
-            )
+            bleBinder?.let { binder ->
+              ChatScreen(
+                binder, backStackEntry.arguments?.getString("deviceId")
+              ) {
+                // Navigate to user info screen
+                navController.navigate("user/$it")
+              }
+            }
           }
           composable("add") {
             AddDeviceScreen(bleBinder, userId) {
               navController.popBackStack()
+            }
+          }
+          composable(
+            "user/{deviceId}",
+            arguments = listOf(navArgument("deviceId") { type = NavType.StringType })
+          ) { backStackEntry ->
+            // User info screen
+            bleBinder?.let {
+              UserInfoScreen(
+                it,
+                backStackEntry.arguments?.getString("deviceId"),
+                backStackEntry.arguments?.getString("deviceId") == userId
+              )
             }
           }
         }

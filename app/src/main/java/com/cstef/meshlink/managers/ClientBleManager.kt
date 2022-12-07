@@ -2,12 +2,16 @@ package com.cstef.meshlink.managers
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.PendingIntent
 import android.bluetooth.*
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
@@ -22,8 +26,10 @@ import com.cstef.meshlink.R
 import com.cstef.meshlink.util.BleUuid
 import com.cstef.meshlink.util.struct.*
 import com.daveanthonythomas.moshipack.MoshiPack
+import java.math.RoundingMode
 import java.security.KeyFactory
 import java.security.spec.X509EncodedKeySpec
+import java.text.DecimalFormat
 import java.util.*
 
 class ClientBleManager(
@@ -53,7 +59,9 @@ class ClientBleManager(
     val chunksTotal: Int,
     val builder: NotificationCompat.Builder,
     val userId: String,
-    val notificationId: Int
+    val notificationId: Int,
+    val startTime: Long = System.currentTimeMillis(),
+    val receiver: BroadcastReceiver
   )
 
   private val sendingChunks = mutableMapOf<String, ChunkSendingState>()
@@ -116,6 +124,12 @@ class ClientBleManager(
                 val serverId =
                   connectedServersAddresses.entries.find { it.value == gatt.device.address }?.key
                 if (serverId != null) {
+                  if (sendingChunks.containsKey(gatt.device.address)) {
+                    sendingChunks.remove(gatt.device.address)
+                    val notificationId = serverId.hashCode()
+                    NotificationManagerCompat.from(context).cancel(notificationId)
+                    dataExchangeManager.onMessageSendFailed(serverId, "Connection error")
+                  }
                   connectedServersAddresses.remove(serverId)
                   dataExchangeManager.onUserDisconnected(serverId)
                 }
@@ -127,6 +141,12 @@ class ClientBleManager(
                 val serverId =
                   connectedServersAddresses.entries.find { it.value == gatt.device.address }?.key
                 if (serverId != null) {
+                  if (sendingChunks.containsKey(gatt.device.address)) {
+                    sendingChunks.remove(gatt.device.address)
+                    val notificationId = serverId.hashCode()
+                    NotificationManagerCompat.from(context).cancel(notificationId)
+                    dataExchangeManager.onMessageSendFailed(serverId, "Connection error")
+                  }
                   connectedServersAddresses.remove(serverId)
                   dataExchangeManager.onUserDisconnected(serverId)
                 }
@@ -236,6 +256,7 @@ class ClientBleManager(
       }
     }
 
+    @SuppressLint("RestrictedApi")
     override fun onCharacteristicWrite(
       gatt: BluetoothGatt?, characteristic: BluetoothGattCharacteristic?, status: Int
     ) {
@@ -261,7 +282,8 @@ class ClientBleManager(
             )
             chunkState.builder
               .setContentTitle("Upload complete")
-              .setProgress(chunkState.chunksTotal, chunkState.chunksSent, false)
+              .setContentText("")
+              .setProgress(0, 0, false)
               .setOngoing(false)
               .setAutoCancel(true)
               .setPriority(NotificationCompat.PRIORITY_DEFAULT)
@@ -271,10 +293,23 @@ class ClientBleManager(
             callbackHandler.post {
               dataExchangeManager.onMessageSent(chunkState.userId)
             }
+            sendingChunks.remove(gatt?.device?.address)
+            // Unregister the receiver
+            context.unregisterReceiver(chunkState.receiver)
           } else {
             chunkState.builder.setProgress(
               chunkState.chunksTotal, chunkState.chunksSent, false
+            ).setOngoing(true)
+            val timeDiff = System.currentTimeMillis() - chunkState.startTime
+            val speed = (chunkState.chunksSent * Chunk.CHUNK_SIZE / 1000.0) / (timeDiff / 1000.0)
+            val df = DecimalFormat("#.##")
+            df.roundingMode = RoundingMode.CEILING
+            chunkState.builder.setContentText(
+              "Average speed: ${
+                df.format(speed).toDouble()
+              } kB/s"
             )
+            chunkState.builder.mActions.clear()
             val notificationManager = NotificationManagerCompat.from(context)
             notificationManager.notify(chunkState.notificationId, chunkState.builder.build())
           }
@@ -352,37 +387,64 @@ class ClientBleManager(
   }
 
   @SuppressLint("MissingPermission")
-  private fun BluetoothGatt.writeData(data: BleData) {
+  private fun BluetoothGatt.writeMessage(message: Message) {
     // Log.d("ClientBleManager", "writeData: $data")
-    val publicKeyForUser = data.recipientId?.let { dataExchangeManager.getPublicKeyForUser(it) }
-    data.content =
-      if (data.recipientId != null && data.senderId == userId && publicKeyForUser != null) (encryptionManager.encrypt(
-        data.content, publicKeyForUser
+    val publicKeyForUser = message.recipientId?.let { dataExchangeManager.getPublicKeyForUser(it) }
+    message.content =
+      if (message.recipientId != null && message.senderId == userId && publicKeyForUser != null) (encryptionManager.encrypt(
+        message.content, publicKeyForUser
       ))
-      else data.content
-    val value = moshi.packToByteArray(data)
+      else message.content
+    val value = moshi.packToByteArray(message)
     Log.d("ClientBleManager", "writeData: value.size = ${value.size}")
 
-    val chunks = value.chunked(505) // MTU (512) - Header (4) - Chunk metadata (3) = 512-4-3 = 505
+    val chunks = value.chunked(Chunk.CHUNK_SIZE)
     Log.d("ClientBleManager", "writeData: chunks.size = ${chunks.size}")
     // Create a notification
-    if (chunks.size > 1) {
+    if (chunks.size > 2) {
       notification = NotificationCompat.Builder(context, "data")
         .setSmallIcon(R.drawable.ic_baseline_bluetooth_24).setContentTitle("Sending data")
-        .setContentText("Sending data to ${data.recipientId}")
+        .setContentText("Sending data to ${message.recipientId}")
         .setPriority(NotificationCompat.PRIORITY_DEFAULT).setSilent(true).setOngoing(true)
         .setProgress(chunks.size, 0, false)
+        .addAction(
+          com.google.android.material.R.drawable.ic_m3_chip_close,
+          "Cancel",
+          PendingIntent.getBroadcast(
+            context,
+            0,
+            Intent("cancel_sending"),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+          )
+        )
       val notificationManager = NotificationManagerCompat.from(context)
-      val notificationId = data.recipientId.hashCode()
+      val notificationId = message.recipientId.hashCode()
       notificationManager.notify(
         notificationId, notification!!.build()
       )
+      val receiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+          Log.d("ClientBleManager", "onReceive: cancel_sending")
+          chunksOperationQueue.clear()
+          sendingChunks.remove(device.address)
+          notificationManager.cancel(notificationId)
+          context?.unregisterReceiver(this)
+          dataExchangeManager.onMessageSendFailed(message.recipientId, "Cancelled by user")
+        }
+      }
       sendingChunks[device.address] = ChunkSendingState(
-        0, chunks.size, notification!!, data.recipientId!!, notificationId
+        0,
+        chunks.size,
+        notification!!,
+        message.recipientId!!,
+        notificationId,
+        System.currentTimeMillis(),
+        receiver
       )
+      context.registerReceiver(receiver, IntentFilter("cancel_sending"))
     }
     chunks.forEachIndexed { index, chunk ->
-      val chunkValue = Chunk(index == chunks.size - 1, index.toShort(), chunk)
+      val chunkValue = Chunk(index == chunks.size - 1, index.toShort(), chunk, value.hashCode())
       chunksOperationQueue.execute {
         sendChunk(chunkValue)
       }
@@ -415,46 +477,63 @@ class ClientBleManager(
   }
 
   fun broadcastData(message: Message) {
-    val bleData = BleData.fromMessage(message)
     connectedGattServers.values.filter { connectedServersAddresses.entries.find { entry -> entry.value == it.device.address }?.key != message.senderId }
       .forEach {
-        it.writeData(bleData)
+        it.writeMessage(message)
       }
   }
 
   fun sendData(message: Message) {
-    val bleData = BleData.fromMessage(message)
     val deviceAddress = connectedServersAddresses[message.recipientId]
     if (deviceAddress != null) {
-      connectedGattServers[deviceAddress]?.writeData(bleData)
+      connectedGattServers[deviceAddress]?.writeMessage(message)
     } else {
       Log.w("ClientBleManager", "sendData: deviceAddress is null")
     }
   }
 
   @SuppressLint("MissingPermission")
-  @Suppress("DEPRECATION")
-  fun sendIsWriting(userId: String, writing: Boolean) {
+  fun disconnectAll() {
+    connectedGattServers.values.forEach { it.disconnect() }
+    connectedGattServers.clear()
+    connectedServersAddresses.clear()
+  }
+
+  @SuppressLint("MissingPermission")
+  fun disconnect(userId: String) {
     val deviceAddress = connectedServersAddresses[userId]
-    val server = deviceAddress?.let { connectedGattServers[it] }
-    if (server != null) {
-      val characteristic =
-        server.getService(UUID.fromString(BleUuid.SERVICE_UUID))?.getCharacteristic(
-          UUID.fromString(
-            BleUuid.USER_WRITING_UUID
-          )
-        )
-      if (characteristic != null) {
-        characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
-        characteristic.value = moshi.packToByteArray(WritingData(userId, writing))
-        server.writeCharacteristic(characteristic)
-      } else {
-        Log.w("ClientBleManager", "sendIsWriting: characteristic is null")
-      }
+    if (deviceAddress != null) {
+      connectedGattServers[deviceAddress]?.disconnect()
+      connectedGattServers.remove(deviceAddress)
+      connectedServersAddresses.remove(userId)
     } else {
-      Log.w("ClientBleManager", "sendIsWriting: server is null")
+      Log.w("ClientBleManager", "disconnect: deviceAddress is null")
     }
   }
+
+//  @SuppressLint("MissingPermission")
+//  @Suppress("DEPRECATION")
+//  fun sendIsWriting(userId: String, writing: Boolean) {
+//    val deviceAddress = connectedServersAddresses[userId]
+//    val server = deviceAddress?.let { connectedGattServers[it] }
+//    if (server != null) {
+//      val characteristic =
+//        server.getService(UUID.fromString(BleUuid.SERVICE_UUID))?.getCharacteristic(
+//          UUID.fromString(
+//            BleUuid.USER_WRITING_UUID
+//          )
+//        )
+//      if (characteristic != null) {
+//        characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+//        characteristic.value = moshi.packToByteArray(WritingData(userId, writing))
+//        server.writeCharacteristic(characteristic)
+//      } else {
+//        Log.w("ClientBleManager", "sendIsWriting: characteristic is null")
+//      }
+//    } else {
+//      Log.w("ClientBleManager", "sendIsWriting: server is null")
+//    }
+//  }
 }
 
 private fun ByteArray.chunked(i: Int): List<ByteArray> {

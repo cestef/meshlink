@@ -1,18 +1,23 @@
 package com.cstef.meshlink
 
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
-import android.os.*
+import android.os.Binder
+import android.os.Handler
+import android.os.HandlerThread
+import android.os.IBinder
 import android.util.Log
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
+import androidx.lifecycle.LiveData
+import com.cstef.meshlink.db.AppDatabase
+import com.cstef.meshlink.db.entities.Device
 import com.cstef.meshlink.managers.BleManager
 import com.cstef.meshlink.managers.EncryptionManager
-import com.cstef.meshlink.util.struct.BleData
+import com.cstef.meshlink.repositories.DeviceRepository
+import com.cstef.meshlink.repositories.MessageRepository
 import com.cstef.meshlink.util.struct.Chunk
-import com.cstef.meshlink.util.struct.ConnectedDevice
 import com.cstef.meshlink.util.struct.Message
 import com.daveanthonythomas.moshipack.MoshiPack
 import java.security.PublicKey
@@ -21,8 +26,7 @@ import java.util.*
 
 class BleService : Service() {
   companion object {
-    const val EXTRA_DEVICES = "com.cstef.meshlink.devices"
-    val ACTION_USER = Intent("com.cstef.meshlink.ACTION_USER")
+    val ACTION_DEVICE = Intent("com.cstef.meshlink.ACTION_USER")
     val ACTION_MESSAGES = Intent("com.cstef.meshlink.ACTION_MESSAGES")
   }
 
@@ -43,47 +47,107 @@ class BleService : Service() {
     val isBleStarted
       get() = bleManager.isStarted
 
+    val allMessages: LiveData<List<com.cstef.meshlink.db.entities.Message>>
+      get() = this@BleService.allMessages
+
+    val allDevices: LiveData<List<Device>>
+      get() = this@BleService.allDevices
+
     fun sendMessage(receiverId: String, message: String, type: String = Message.Type.TEXT) {
-      this@BleService.sendMessage(BleData(userId, message, receiverId, type))
-    }
-
-    fun getMessages(receiverId: String): List<Message> {
-      return messages[receiverId] ?: listOf()
-    }
-
-    fun getConnectedDevices(): List<ConnectedDevice> {
-      return connectedDevices
+      this@BleService.sendMessage(
+        Message(
+          UUID.randomUUID().toString(),
+          userId,
+          receiverId,
+          message,
+          type,
+          System.currentTimeMillis(),
+          true
+        )
+      )
     }
 
     fun addDevice(userId: String) {
       bleDataExchangeManager.onUserConnected(userId)
     }
-    fun sendIsWriting(userId: String, isWriting: Boolean) {
-      this@BleService.sendIsWriting(userId, isWriting)
+
+//    fun sendIsWriting(userId: String, isWriting: Boolean) {
+//      this@BleService.sendIsWriting(userId, isWriting)
+//    }
+
+    fun getPublicKeySignature(otherUserId: String): String? {
+      val publicKey =
+        if (otherUserId == userId) encryptionManager.publicKey else publicKeys[otherUserId]
+      return publicKey?.let { encryptionManager.getPublicKeySignature(it) }
+    }
+
+    fun blockUser(userId: String) {
+      val device = allDevices.value?.find { it.userId == userId }
+      if (device != null) {
+        deviceRepository.update(device.copy(blocked = true))
+      } else {
+        Log.e("BleService", "Device not found")
+        Toast.makeText(this@BleService, "Device not found", Toast.LENGTH_SHORT).show()
+      }
+    }
+
+    fun unblockUser(userId: String) {
+      val device = allDevices.value?.find { it.userId == userId }
+      if (device != null) {
+        deviceRepository.update(device.copy(blocked = false))
+      } else {
+        Log.e("BleService", "Device not found")
+        Toast.makeText(this@BleService, "Device not found", Toast.LENGTH_SHORT).show()
+      }
+    }
+
+    fun updateDeviceName(userId: String, name: String) {
+      val device = allDevices.value?.find { it.userId == userId }
+      if (device != null) {
+        deviceRepository.update(device.copy(name = name))
+      } else {
+        Log.e("BleService", "Device not found")
+        Toast.makeText(this@BleService, "Device not found", Toast.LENGTH_SHORT).show()
+      }
+    }
+
+    fun deleteAllData() {
+      deviceRepository.deleteAll()
+      messageRepository.deleteAll()
+      // Disconnect from all devices
+      bleManager.disconnectAll()
+
+    }
+
+    fun deleteDataForUser(device: Device) {
+      deviceRepository.delete(device)
+      messageRepository.delete(device.userId)
+      // Disconnect from device
+      bleManager.disconnect(device.userId)
     }
   }
 
-  private fun sendIsWriting(userId: String, writing: Boolean) {
-    bleManager.sendIsWriting(userId, writing)
-  }
-
-  private val connectedDevices = mutableListOf<ConnectedDevice>()
-  val messages: MutableMap<String, MutableList<Message>> = mutableMapOf()
   val messagesHashes: MutableMap<String, MutableList<String>> = mutableMapOf()
   val publicKeys: MutableMap<String, PublicKey> = mutableMapOf()
-  val chunks: MutableMap<String, MutableList<Chunk>> = mutableMapOf()
+  val chunks: MutableMap<String, MutableMap<Int, MutableList<Chunk>>> =
+    mutableMapOf() // userId -> messageId -> chunks
 
   private val bleDataExchangeManager = object : BleManager.BleDataExchangeManager {
     override fun onUserConnected(userId: String) {
       Log.d("BleService", "onUserConnected: $userId")
-      if (!connectedDevices.any { it.id == userId }) {
-        connectedDevices.add(ConnectedDevice(userId, null, 0, true, System.currentTimeMillis()))
-        val intent = Intent(ACTION_USER)
+      val devices = allDevices.value ?: emptyList()
+      if (!devices.any { it.userId == userId }) {
+        deviceRepository.insert(Device(userId, 0, System.currentTimeMillis(), true))
+        val intent = Intent(ACTION_DEVICE)
         sendBroadcast(intent)
       } else {
-        connectedDevices.find { it.id == userId }?.let {
-          it.connected = true
-          it.lastSeen = System.currentTimeMillis()
+        devices.find { it.userId == userId }?.let {
+          deviceRepository.update(
+            it.copy(
+              lastSeen = System.currentTimeMillis(),
+              connected = true
+            )
+          )
         }
       }
     }
@@ -110,55 +174,69 @@ class BleService : Service() {
       Log.d("BleService", "onChunkReceived: $address")
       Log.d(
         "BleService",
-        "onChunkReceived: chunk.index: ${chunk.index}, chunk.data.size: ${chunk.data.size}"
+        "onChunkReceived: chunk.index: ${chunk.index}, chunk.data.size: ${chunk.data.size}, chunk.messageId: ${chunk.messageId}"
       )
       if (chunks.containsKey(address)) {
-        chunks[address]?.add(chunk)
+        chunks[address]?.let { chunks ->
+          if (chunks.containsKey(chunk.messageId)) {
+            chunks[chunk.messageId]?.add(chunk)
+          } else {
+            chunks[chunk.messageId] = mutableListOf(chunk)
+          }
+        }
       } else {
-        chunks[address] = mutableListOf(chunk)
+        chunks[address] = mutableMapOf(chunk.messageId to mutableListOf(chunk))
       }
       if (chunk.isLast) {
         Log.d("BleService", "onChunkReceived: Last chunk received")
-        val chunks = chunks[address] ?: return
+        val chunks = chunks[address]?.get(chunk.messageId) ?: return
+        // Check if a chunk is missing (all indexes are present)
+        val indexes = chunks.map { it.index }
+        val missingIndexes = (0 until chunks.size).filter { !indexes.contains(it.toShort()) }
+        if (missingIndexes.isNotEmpty()) {
+          Log.e("BleService", "onChunkReceived: Missing chunks: $missingIndexes")
+          return
+        }
         val data = chunks.sortedBy { it.index }.map { it.data }.reduce { acc, bytes -> acc + bytes }
         Log.d("BleService", "onChunkReceived: data.size: ${data.size}")
         chunks.clear()
-        val bleData = moshi.unpack<BleData>(data)
+        val message = moshi.unpack<Message>(data)
         //Log.d("BleService", "bleData: $bleData")
-        val hash = encryptionManager.md5(moshi.packToByteArray(bleData))
-        if (messagesHashes[bleData.senderId]?.contains(hash) == true) {
+        val hash = encryptionManager.md5(data)
+        if (messagesHashes[message.senderId]?.contains(hash) == true) {
           Log.d("BleService", "Message in cache")
           return
         }
-        if (bleData.recipientId == userId) {
+        if (message.recipientId == userId) {
           //Log.d("BleService", "onDataReceived: $bleData")
-          messagesHashes[bleData.senderId]?.add(hash)
-          bleData.content = encryptionManager.decrypt(bleData.content)
-          val messagesForUser = messages.getOrPut(bleData.senderId) { mutableListOf() }
-          val newMessage = Message.fromBleData(
-            bleData, false
-          )
-          messagesForUser.add(
-            newMessage
-          )
-          Log.d(
-            "BleService", "onDataReceived: ${newMessage.senderId}: ${newMessage.content}"
+          messagesHashes[message.senderId]?.add(hash)
+          message.content = encryptionManager.decrypt(message.content)
+
+          messageRepository.insert(
+            com.cstef.meshlink.db.entities.Message(
+              message.id,
+              message.senderId,
+              message.recipientId,
+              message.content,
+              message.type,
+              message.timestamp
+            )
           )
           // Send notification to user phone
           val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-          // Go to the chat screen when the user clicks on the notification
-          val clickIntent = Intent(this@BleService, MainActivity::class.java)
-          clickIntent.putExtra("userId", bleData.senderId)
-          val pendingIntent = PendingIntent.getActivity(
-            this@BleService, 0, clickIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-          )
+//          // Go to the chat screen when the user clicks on the notification
+//          val clickIntent = Intent(this@BleService, MainActivity::class.java)
+//          clickIntent.putExtra("userId", message.senderId)
+//          val pendingIntent = PendingIntent.getActivity(
+//            this@BleService, 0, clickIntent,
+//            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+//          )
           val notification = NotificationCompat.Builder(this@BleService, "messages")
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("MeshLink")
             .setContentText(
-              if (newMessage.type == Message.Type.TEXT) "${newMessage.senderId}: ${newMessage.content}" else "${newMessage.senderId}: ${
-                newMessage.type.replaceFirstChar {
+              if (message.type == Message.Type.TEXT) "${message.senderId}: ${message.content}" else "${message.senderId}: ${
+                message.type.replaceFirstChar {
                   if (it.isLowerCase()) it.titlecase(
                     Locale.ROOT
                   ) else it.toString()
@@ -167,34 +245,37 @@ class BleService : Service() {
             )
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setContentIntent(pendingIntent)
+//            .setContentIntent(pendingIntent)
             .build()
           notificationManager.notify(
-            newMessage.senderId.hashCode(), notification
+            message.senderId.hashCode(), notification
           )
-          messages[bleData.senderId] = messagesForUser
+
           val intent = Intent(ACTION_MESSAGES)
           sendBroadcast(intent)
-        } else if (listOf(Message.Type.TEXT).contains(bleData.type) && bleData.ttl > 0) {
+        } else if (listOf(Message.Type.TEXT).contains(message.type) && message.ttl > 0) {
           Log.d("BleService", "onDataReceived: not for me")
           Toast.makeText(application, "Propagating a message", Toast.LENGTH_SHORT).show()
-          bleData.ttl -= 1
-          sendMessage(bleData)
+          message.ttl -= 1
+          sendMessage(message)
         }
       }
     }
 
+    override fun onMessageSendFailed(userId: String?, reason: String?) {
+      Log.d("BleService", "onMessageSendFailed: $userId")
+      Toast.makeText(application, "Message to $userId failed: $reason", Toast.LENGTH_LONG).show()
+    }
+
     override fun onUserDisconnected(userId: String) {
       Log.d("MainViewModel", "onUserDisconnected: $userId")
-      connectedDevices.map { it.id }.indexOf(userId).let {
+      val devices = allDevices.value ?: return
+      devices.map { it.userId }.indexOf(userId).let {
         if (it != -1) {
-          connectedDevices[it].connected = false
-          connectedDevices[it].lastSeen = System.currentTimeMillis()
-          val intent = Intent(ACTION_USER)
-          sendBroadcast(intent)
+          deviceRepository.update(devices[it].copy(connected = false))
         }
       }
-      val intent = Intent(ACTION_USER)
+      val intent = Intent(ACTION_DEVICE)
       sendBroadcast(intent)
     }
 
@@ -203,9 +284,15 @@ class BleService : Service() {
     }
 
     override fun onUserRssiReceived(userId: String, rssi: Int) {
-      connectedDevices.find { it.id == userId }?.rssi = rssi
-      val intent = Intent(ACTION_USER)
-      sendBroadcast(intent)
+      val devices = allDevices.value ?: return
+      if (devices.isNotEmpty()) {
+        val device = devices[0]
+        if (device.rssi != rssi) {
+          deviceRepository.update(device.copy(rssi = rssi))
+          val intent = Intent(ACTION_DEVICE)
+          sendBroadcast(intent)
+        }
+      }
     }
 
     override fun getUserIdForAddress(address: String): String? {
@@ -213,15 +300,28 @@ class BleService : Service() {
     }
 
     override fun onUserWriting(userId: String, isWriting: Boolean) {
-      Log.d("BleService", "onUserWriting: $userId, $isWriting")
-      connectedDevices.find { it.id == userId }?.writing = isWriting
-      val intent = Intent(ACTION_USER)
-      sendBroadcast(intent)
+//      Log.d("BleService", "onUserWriting: $userId, $isWriting")
+//      val deviceDao = db.deviceDao()
+//      val devices = deviceDao.getDevice(userId)
+//      if (devices.isNotEmpty()) {
+//        val device = devices[0]
+//        if (device.isWriting != isWriting) {
+//          deviceDao.update(device.copy(isWriting = isWriting))
+//          val intent = Intent(ACTION_USER)
+//          sendBroadcast(intent)
+//        }
+//      }
+//      val intent = Intent(ACTION_USER)
+//      sendBroadcast(intent)
     }
   }
-
   lateinit var bleManager: BleManager
   private lateinit var encryptionManager: EncryptionManager
+
+  lateinit var allMessages: LiveData<List<com.cstef.meshlink.db.entities.Message>>
+  lateinit var allDevices: LiveData<List<Device>>
+  lateinit var messageRepository: MessageRepository
+  lateinit var deviceRepository: DeviceRepository
 
   override fun onDestroy() {
     super.onDestroy()
@@ -234,6 +334,13 @@ class BleService : Service() {
     handler = Handler(handlerThread.looper)
     encryptionManager = EncryptionManager()
     bleManager = BleManager(applicationContext, bleDataExchangeManager, encryptionManager, handler)
+    val db = AppDatabase.getInstance(application)
+    val messageDao = db.messageDao()
+    val deviceDao = db.deviceDao()
+    messageRepository = MessageRepository(messageDao)
+    deviceRepository = DeviceRepository(deviceDao)
+    allMessages = messageRepository.allMessages
+    allDevices = deviceRepository.allDevices
   }
 
   fun startBle(userId: String) {
@@ -246,11 +353,23 @@ class BleService : Service() {
     if (bleManager.isStarted.value) bleManager.stop()
   }
 
-  fun sendMessage(bleData: BleData) {
-    if (bleData.recipientId != null) {
-      val messageData = Message.fromBleData(bleData, true)
-      messages.getOrPut(bleData.recipientId) { mutableListOf() }.add(messageData)
-      bleManager.sendData(messageData)
+  fun sendMessage(message: Message) {
+    if (message.recipientId != null) {
+      messageRepository.insert(
+        com.cstef.meshlink.db.entities.Message(
+          message.id,
+          message.senderId,
+          message.recipientId,
+          message.content,
+          message.type,
+          message.timestamp
+        )
+      )
+      bleManager.sendMessage(message)
     }
   }
+
+//  private fun sendIsWriting(userId: String, writing: Boolean) {
+//    bleManager.sendIsWriting(userId, writing)
+//  }
 }

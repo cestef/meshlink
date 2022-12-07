@@ -1,6 +1,7 @@
 package com.cstef.meshlink.ui.components
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,18 +13,27 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.cstef.meshlink.db.entities.Device
 import com.cstef.meshlink.ui.theme.DarkColors
 import com.cstef.meshlink.ui.theme.LightColors
-import com.cstef.meshlink.util.struct.ConnectedDevice
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun AvailableDevice(device: ConnectedDevice, onClick: (deviceId: String) -> Unit = {}) {
+fun AvailableDevice(
+  device: Device,
+  onDeviceLongClick: (deviceID: String) -> Unit = {},
+  onDeviceClick: (deviceId: String) -> Unit = {}
+) {
   Card(
     modifier = Modifier
       .padding(8.dp)
       .fillMaxWidth()
-      .clickable { onClick(device.id) }, shape = MaterialTheme.shapes.medium,
+      .combinedClickable(
+        onClick = { onDeviceClick(device.userId) },
+        onLongClick = { onDeviceLongClick(device.userId) }),
+    shape = MaterialTheme.shapes.medium,
     colors = CardDefaults.cardColors(
       containerColor = if (device.connected) {
         if (isSystemInDarkTheme()) DarkColors.primaryContainer else LightColors.primaryContainer
@@ -45,7 +55,12 @@ fun AvailableDevice(device: ConnectedDevice, onClick: (deviceId: String) -> Unit
           .padding(24.dp)
           .weight(1f)
       ) {
-        Text(text = device.id, style = MaterialTheme.typography.titleMedium)
+        Text(
+          text = device.name ?: device.userId,
+          style = MaterialTheme.typography.titleMedium,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
       }
       Column(
         modifier = Modifier
@@ -63,13 +78,13 @@ fun AvailableDevice(device: ConnectedDevice, onClick: (deviceId: String) -> Unit
           else Icons.Rounded.SignalWifiStatusbarConnectedNoInternet4,
           contentDescription = "Signal strength",
         )
-        if (device.writing) {
-          Icon(
-            imageVector = Icons.Rounded.BluetoothSearching,
-            contentDescription = "Writing",
-            modifier = Modifier.padding(start = 8.dp)
-          )
-        }
+//        if (device.writing) {
+//          Icon(
+//            imageVector = Icons.Rounded.BluetoothSearching,
+//            contentDescription = "Writing",
+//            modifier = Modifier.padding(start = 8.dp)
+//          )
+//        }
       }
     }
   }
