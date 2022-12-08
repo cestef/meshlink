@@ -20,4 +20,11 @@ interface DeviceDao {
 
   @Query("DELETE FROM devices")
   fun deleteAll()
+
+  @Query("UPDATE devices SET connected = :connected")
+  fun updateAllConnected(connected: Boolean)
+
+  @Query("SELECT 1")
+  fun checkDatabaseWorking(): Boolean
+
 }

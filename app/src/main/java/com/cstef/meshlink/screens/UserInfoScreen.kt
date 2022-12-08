@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -114,8 +115,7 @@ fun UserInfoScreen(
         color = colors.onBackground
       )
       val (newName, setNewName) = remember { mutableStateOf(device?.name ?: "") }
-      OutlinedTextField(
-        value = newName,
+      OutlinedTextField(value = newName,
         onValueChange = {
           setNewName(it)
         },
@@ -131,43 +131,35 @@ fun UserInfoScreen(
               bleBinder.updateDeviceName(userId, newName)
             }) {
               Icon(
-                imageVector = Icons.Default.Done,
-                contentDescription = "Done"
+                imageVector = Icons.Default.Done, contentDescription = "Done"
               )
             }
           }
-        }
-      )
+        })
 
       if (!isMe) {
         val (chooseDeleteMode, setChooseDeleteMode) = remember { mutableStateOf(false) }
         if (chooseDeleteMode) {
-          AlertDialog(
-            onDismissRequest = { setChooseDeleteMode(false) },
+          AlertDialog(onDismissRequest = { setChooseDeleteMode(false) },
             title = { Text("Delete data") },
             text = { Text("Are you sure you want to delete all data for this user?") },
             confirmButton = {
-              Button(
-                onClick = {
-                  if (device != null) {
-                    bleBinder.deleteDataForUser(device)
-                  }
-                  setChooseDeleteMode(false)
+              Button(onClick = {
+                if (device != null) {
+                  bleBinder.deleteDataForUser(device)
                 }
-              ) {
+                setChooseDeleteMode(false)
+              }) {
                 Text("Delete")
               }
             },
             dismissButton = {
-              TextButton(
-                onClick = {
-                  setChooseDeleteMode(false)
-                }
-              ) {
+              TextButton(onClick = {
+                setChooseDeleteMode(false)
+              }) {
                 Text("Cancel")
               }
-            }
-          )
+            })
         }
         Row(
           modifier = Modifier
@@ -186,8 +178,7 @@ fun UserInfoScreen(
               } else {
                 bleBinder.blockUser(userId)
               }
-            },
-            modifier = Modifier.padding(start = 16.dp)
+            }, modifier = Modifier.padding(start = 16.dp)
           ) {
             Text(
               text = if (device?.blocked == true) "Unblock" else "Block",
@@ -196,11 +187,12 @@ fun UserInfoScreen(
         }
       } else {
         val (confirmDelete, setConfirmDelete) = remember { mutableStateOf(false) }
+        val (passwordDialogVisible, setPasswordDialogVisible) = remember { mutableStateOf(false) }
+
         if (confirmDelete) {
-          AlertDialog(
-            onDismissRequest = {
-              setConfirmDelete(false)
-            },
+          AlertDialog(onDismissRequest = {
+            setConfirmDelete(false)
+          },
             title = { Text("Delete data") },
             text = { Text("Are you sure you want to delete all data?") },
             confirmButton = {
@@ -217,20 +209,83 @@ fun UserInfoScreen(
               }) {
                 Text("Cancel")
               }
-            }
-          )
+            })
         }
-        Button(
-          onClick = {
-            setConfirmDelete(true)
+        if (passwordDialogVisible) {
+          val (newPassword, setNewPassword) = remember { mutableStateOf("") }
+          AlertDialog(onDismissRequest = {
+            setPasswordDialogVisible(false)
           },
+            title = { Text("Enter password") },
+            text = {
+              Column {
+                OutlinedTextField(value = newPassword,
+                  onValueChange = {
+                    setNewPassword(it)
+                  },
+                  label = { Text("New password") },
+                  modifier = Modifier
+                    .padding(top = 16.dp, bottom = 16.dp)
+                    .align(Alignment.CenterHorizontally),
+                  singleLine = true,
+                  trailingIcon = {
+                    IconButton(onClick = {
+                      setNewPassword("")
+                    }) {
+                      Icon(
+                        imageVector = Icons.Default.Clear, contentDescription = "Clear"
+                      )
+                    }
+                  })
+              }
+            },
+            confirmButton = {
+              Button(onClick = {
+                val success = bleBinder.changeDatabasePassword(newPassword)
+                if (success) {
+                  setPasswordDialogVisible(false)
+                } else {
+                  Toast
+                    .makeText(context, "Wrong password", Toast.LENGTH_SHORT)
+                    .show()
+                }
+              }) {
+                Text("Set")
+              }
+            },
+            dismissButton = {
+              TextButton(onClick = {
+                setPasswordDialogVisible(false)
+              }) {
+                Text("Cancel")
+              }
+            })
+        }
+        Row(
           modifier = Modifier
-            .padding(top = 16.dp, bottom = 16.dp)
             .align(Alignment.CenterHorizontally)
+            .padding(top = 16.dp, bottom = 16.dp)
         ) {
-          Text(
-            text = "Delete all data",
-          )
+          Button(
+            onClick = {
+              setConfirmDelete(true)
+            }, modifier = Modifier
+
+          ) {
+            Text(
+              text = "Delete all data",
+            )
+          }
+          Button(
+            onClick = {
+              setPasswordDialogVisible(true)
+            }, modifier = Modifier.padding(start = 16.dp)
+
+          ) {
+            Text(
+              text = "Set password",
+            )
+          }
         }
       }
     }

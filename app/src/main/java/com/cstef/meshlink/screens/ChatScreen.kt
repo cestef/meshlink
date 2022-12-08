@@ -65,7 +65,7 @@ fun ChatScreen(
               )
           ) {
             Text(
-              text = deviceId,
+              text = device?.name ?: deviceId,
               style = MaterialTheme.typography.titleLarge,
               color = if (isSystemInDarkTheme()) DarkColors.onSurface else LightColors.onSurface
             )

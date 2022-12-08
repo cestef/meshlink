@@ -23,15 +23,22 @@ import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavType
@@ -107,7 +114,7 @@ class MainActivity : AppCompatActivity() {
   @ExperimentalAnimationApi
   @ExperimentalMaterial3Api
   @Composable
-  private fun App() {
+  private fun App(firstTime: Boolean) {
     AppTheme {
       Box(
         modifier = Modifier
@@ -118,82 +125,169 @@ class MainActivity : AppCompatActivity() {
       ) {
         val started by bleBinder?.isBleStarted!!
         val navController = rememberNavController()
-        NavHost(navController = navController, startDestination = "scan") {
-          composable("scan") {
-            Box(modifier = Modifier.fillMaxSize()) {
-              if (bleBinder != null) {
-                ScanScreen(
-                  bleBinder!!,
-                  userId,
-                  { navController.navigate("user/$userId") },
-                  { navController.navigate("user/$it") },
-                  { navController.navigate("chat/$it") }
-                )
-                // Manually add a device via its ID
-                FloatingActionButton(
-                  onClick = {
-                    navController.navigate("add")
-                  },
-                  modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(24.dp)
-                ) {
-                  Icon(
-                    imageVector = Icons.Rounded.Add,
-                    contentDescription = "Add device",
+        val isDatabaseOpen by bleBinder!!.isDatabaseOpen.observeAsState(false)
+        val isDatabaseOpening by bleBinder!!.isDatabaseOpening.observeAsState(false)
+        val databaseError by bleBinder!!.databaseError.observeAsState("")
+
+        LaunchedEffect(databaseError) {
+          if (databaseError.isNotEmpty()) {
+            Toast.makeText(this@MainActivity, databaseError, Toast.LENGTH_LONG).show()
+          }
+        }
+        if (!isDatabaseOpen && !isDatabaseOpening) {
+          // Prompt the user to enter the master database password
+          val (masterPassword, setMasterPassword) = remember { mutableStateOf("") }
+          AlertDialog(
+            onDismissRequest = {},
+            title = {
+              Text(text = if (firstTime) "Set Master Password" else "Enter Master Password")
+            },
+            text = {
+              var passwordVisible by rememberSaveable { mutableStateOf(false) }
+              Column {
+                if (firstTime) {
+                  Text(
+                    text = "This password will be used to encrypt your database.",
+                    modifier = Modifier.padding(bottom = 16.dp)
                   )
                 }
-                ExtendedFloatingActionButton(
-                  onClick = {
-                    if (started) {
-                      stopBle()
-                    } else {
-                      startBle()
+                OutlinedTextField(
+                  value = masterPassword,
+                  onValueChange = { setMasterPassword(it) },
+                  label = { Text(text = "Master password") },
+                  singleLine = true,
+                  visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                  modifier = Modifier.fillMaxWidth(),
+                  keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                  trailingIcon = {
+                    val image = if (passwordVisible)
+                      Icons.Filled.Visibility
+                    else Icons.Filled.VisibilityOff
+                    val description = if (passwordVisible) "Hide password" else "Show password"
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                      Icon(imageVector = image, description)
                     }
-                  },
-                  icon = {
+                  }
+                )
+                if (firstTime) {
+                  Text(
+                    text = "You can change it later in your user profile.",
+                    modifier = Modifier.padding(top = 16.dp)
+                  )
+                }
+              }
+            },
+            confirmButton = {
+              Button(
+                onClick = {
+                  if (masterPassword.isNotEmpty()) {
+                    bleBinder?.openDatabase(masterPassword)
+                  }
+                },
+                content = { Text(text = "Confirm") }
+              )
+            },
+            dismissButton = {
+              TextButton(
+                onClick = { finish() },
+                content = { Text(text = "Cancel") }
+              )
+            }
+          )
+        } else if (isDatabaseOpening) {
+          AlertDialog(
+            onDismissRequest = {},
+            title = { Text(text = "Opening database...") },
+            confirmButton = {})
+        } else {
+          LaunchedEffect(Unit) {
+            val sharedPreferences = getSharedPreferences("USER_SETTINGS", Context.MODE_PRIVATE)
+            if (sharedPreferences.getBoolean("first_time", true)) {
+              val editor = sharedPreferences.edit()
+              editor.putBoolean("first_time", false)
+              editor.apply()
+            }
+            if (!started) {
+              bleBinder?.start(userId)
+            }
+          }
+          NavHost(navController = navController, startDestination = "scan") {
+            composable("scan") {
+              Box(modifier = Modifier.fillMaxSize()) {
+                if (bleBinder != null) {
+                  ScanScreen(
+                    bleBinder!!,
+                    userId,
+                    { navController.navigate("user/$userId") },
+                    { navController.navigate("user/$it") },
+                    { navController.navigate("chat/$it") }
+                  )
+                  // Manually add a device via its ID
+                  FloatingActionButton(
+                    onClick = {
+                      navController.navigate("add")
+                    },
+                    modifier = Modifier
+                      .align(Alignment.BottomStart)
+                      .padding(24.dp)
+                  ) {
                     Icon(
-                      imageVector = if (started) Icons.Rounded.Close else Icons.Filled.PlayArrow,
-                      contentDescription = "Start/Stop"
+                      imageVector = Icons.Rounded.Add,
+                      contentDescription = "Add device",
                     )
-                  },
-                  text = { Text(text = if (started) "Stop" else "Start") },
-                  modifier = Modifier
-                    .padding(24.dp)
-                    .align(Alignment.BottomEnd),
+                  }
+                  ExtendedFloatingActionButton(
+                    onClick = {
+                      if (started) {
+                        stopBle()
+                      } else {
+                        startBle()
+                      }
+                    },
+                    icon = {
+                      Icon(
+                        imageVector = if (started) Icons.Rounded.Close else Icons.Filled.PlayArrow,
+                        contentDescription = "Start/Stop"
+                      )
+                    },
+                    text = { Text(text = if (started) "Stop" else "Start") },
+                    modifier = Modifier
+                      .padding(24.dp)
+                      .align(Alignment.BottomEnd),
+                  )
+                }
+              }
+            }
+            composable(
+              "chat/{deviceId}",
+              arguments = listOf(navArgument("deviceId") { type = NavType.StringType })
+            ) { backStackEntry ->
+              bleBinder?.let { binder ->
+                ChatScreen(
+                  binder, backStackEntry.arguments?.getString("deviceId")
+                ) {
+                  // Navigate to user info screen
+                  navController.navigate("user/$it")
+                }
+              }
+            }
+            composable("add") {
+              AddDeviceScreen(bleBinder, userId) {
+                navController.popBackStack()
+              }
+            }
+            composable(
+              "user/{deviceId}",
+              arguments = listOf(navArgument("deviceId") { type = NavType.StringType })
+            ) { backStackEntry ->
+              // User info screen
+              bleBinder?.let {
+                UserInfoScreen(
+                  it,
+                  backStackEntry.arguments?.getString("deviceId"),
+                  backStackEntry.arguments?.getString("deviceId") == userId
                 )
               }
-            }
-          }
-          composable(
-            "chat/{deviceId}",
-            arguments = listOf(navArgument("deviceId") { type = NavType.StringType })
-          ) { backStackEntry ->
-            bleBinder?.let { binder ->
-              ChatScreen(
-                binder, backStackEntry.arguments?.getString("deviceId")
-              ) {
-                // Navigate to user info screen
-                navController.navigate("user/$it")
-              }
-            }
-          }
-          composable("add") {
-            AddDeviceScreen(bleBinder, userId) {
-              navController.popBackStack()
-            }
-          }
-          composable(
-            "user/{deviceId}",
-            arguments = listOf(navArgument("deviceId") { type = NavType.StringType })
-          ) { backStackEntry ->
-            // User info screen
-            bleBinder?.let {
-              UserInfoScreen(
-                it,
-                backStackEntry.arguments?.getString("deviceId"),
-                backStackEntry.arguments?.getString("deviceId") == userId
-              )
             }
           }
         }
@@ -211,20 +305,18 @@ class MainActivity : AppCompatActivity() {
   ) {
     super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     if (requestCode == RequestCode.ACCESS_COARSE_LOCATION) {
-      if (grantResults.isNotEmpty() && grantResults.first() == PackageManager.PERMISSION_GRANTED) {
-        startBle()
-      } else {
+      if (grantResults.isEmpty() || grantResults.first() != PackageManager.PERMISSION_GRANTED) {
         Toast.makeText(this, "Location Permission required to scan", Toast.LENGTH_SHORT).show()
+        requestPermissions()
       }
     }
   }
 
   private var requestBluetooth =
     registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-      if (result.resultCode == RESULT_OK) {
-        startBle()
-      } else {
-        Toast.makeText(this, "Bluetooth required to scan", Toast.LENGTH_SHORT).show()
+      if (result.resultCode != RESULT_OK) {
+        Toast.makeText(this, "Bluetooth is required to scan", Toast.LENGTH_SHORT).show()
+        requestPermissions()
       }
     }
   private val requestMultiplePermissions =
@@ -232,16 +324,19 @@ class MainActivity : AppCompatActivity() {
       permissions.entries.forEach {
         Log.d("test006", "${it.key} = ${it.value}")
       }
-      if (permissions.filter { it.key != Manifest.permission.BLUETOOTH_ADMIN }
-          .all { it.value } || permissions[Manifest.permission.BLUETOOTH_ADMIN] == true) {
-        startBle()
-      } else {
-        Toast.makeText(this, "Not every permission granted, check logs", Toast.LENGTH_SHORT).show()
+      if (!permissions.filter { it.key != Manifest.permission.BLUETOOTH_ADMIN }
+          .all { it.value } && permissions[Manifest.permission.BLUETOOTH_ADMIN] == false) {
+        Toast.makeText(
+          this,
+          "Please allow every permission for MeshLink to work correctly",
+          Toast.LENGTH_SHORT
+        ).show()
+        requestPermissions()
       }
     }
 
-  fun startBle() {
 
+  private fun requestPermissions() {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
       if (ContextCompat.checkSelfPermission(
           this, Manifest.permission.BLUETOOTH_ADMIN
@@ -270,10 +365,10 @@ class MainActivity : AppCompatActivity() {
             Manifest.permission.BLUETOOTH_CONNECT
           )
         )
-
         return
       }
     }
+
     val adapter = (getSystemService(BLUETOOTH_SERVICE) as BluetoothManager).adapter
     if (!adapter.isBleOn) {
       val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
@@ -294,18 +389,19 @@ class MainActivity : AppCompatActivity() {
       )
       return
     }
-    bleService?.startBle(userId)
-    Toast.makeText(this, "Ble Started", Toast.LENGTH_SHORT).show()
+  }
+
+  fun startBle() {
+    bleService?.start(userId)
+    Toast.makeText(this, "Service Started", Toast.LENGTH_SHORT).show()
   }
 
   fun stopBle() {
-    bleService?.stopBle()
-    Toast.makeText(this, "Ble Stopped", Toast.LENGTH_SHORT).show()
+    bleService?.stop()
+    Toast.makeText(this, "Service Started", Toast.LENGTH_SHORT).show()
   }
 
   private fun createNotificationChannels() {
-    // Create the NotificationChannel, but only on API 26+ because
-    // the NotificationChannel class is new and not in the support library
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       val name = getString(R.string.channel_name)
       val descriptionText = getString(R.string.channel_description)
@@ -346,9 +442,12 @@ class MainActivity : AppCompatActivity() {
       Log.d("test006", "onServiceConnected")
       bleService = (service as BleService.BleServiceBinder).service
       bleBinder = service
-      startBle()
+      requestPermissions()
+      // get isFirstTime from shared preferences
+      val sharedPreferences = getSharedPreferences("USER_SETTINGS", Context.MODE_PRIVATE)
+      val isFirstTime = sharedPreferences.getBoolean("first_time", true)
       setContent {
-        App()
+        App(isFirstTime)
       }
     }
 

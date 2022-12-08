@@ -11,6 +11,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import com.cstef.meshlink.db.AppDatabase
 import com.cstef.meshlink.db.entities.Device
 import com.cstef.meshlink.managers.BleManager
@@ -47,11 +48,17 @@ class BleService : Service() {
     val isBleStarted
       get() = bleManager.isStarted
 
+    val isDatabaseOpen: LiveData<Boolean>
+      get() = this@BleService.isDatabaseOpen
+    val isDatabaseOpening: LiveData<Boolean>
+      get() = this@BleService.isDatabaseLoading
+    val databaseError: LiveData<String>
+      get() = this@BleService.databaseError
     val allMessages: LiveData<List<com.cstef.meshlink.db.entities.Message>>
-      get() = this@BleService.allMessages
+      get() = this@BleService.allMessages ?: throw Exception("Database not open")
 
     val allDevices: LiveData<List<Device>>
-      get() = this@BleService.allDevices
+      get() = this@BleService.allDevices ?: throw Exception("Database not open")
 
     fun sendMessage(receiverId: String, message: String, type: String = Message.Type.TEXT) {
       this@BleService.sendMessage(
@@ -84,7 +91,7 @@ class BleService : Service() {
     fun blockUser(userId: String) {
       val device = allDevices.value?.find { it.userId == userId }
       if (device != null) {
-        deviceRepository.update(device.copy(blocked = true))
+        deviceRepository?.update(device.copy(blocked = true))
       } else {
         Log.e("BleService", "Device not found")
         Toast.makeText(this@BleService, "Device not found", Toast.LENGTH_SHORT).show()
@@ -94,7 +101,7 @@ class BleService : Service() {
     fun unblockUser(userId: String) {
       val device = allDevices.value?.find { it.userId == userId }
       if (device != null) {
-        deviceRepository.update(device.copy(blocked = false))
+        deviceRepository?.update(device.copy(blocked = false))
       } else {
         Log.e("BleService", "Device not found")
         Toast.makeText(this@BleService, "Device not found", Toast.LENGTH_SHORT).show()
@@ -104,7 +111,7 @@ class BleService : Service() {
     fun updateDeviceName(userId: String, name: String) {
       val device = allDevices.value?.find { it.userId == userId }
       if (device != null) {
-        deviceRepository.update(device.copy(name = name))
+        deviceRepository?.update(device.copy(name = name))
       } else {
         Log.e("BleService", "Device not found")
         Toast.makeText(this@BleService, "Device not found", Toast.LENGTH_SHORT).show()
@@ -112,18 +119,30 @@ class BleService : Service() {
     }
 
     fun deleteAllData() {
-      deviceRepository.deleteAll()
-      messageRepository.deleteAll()
+      deviceRepository?.deleteAll()
+      messageRepository?.deleteAll()
       // Disconnect from all devices
       bleManager.disconnectAll()
 
     }
 
     fun deleteDataForUser(device: Device) {
-      deviceRepository.delete(device)
-      messageRepository.delete(device.userId)
+      deviceRepository?.delete(device)
+      messageRepository?.delete(device.userId)
       // Disconnect from device
       bleManager.disconnect(device.userId)
+    }
+
+    fun changeDatabasePassword(newPassword: String): Boolean {
+      return AppDatabase.updatePassword(newPassword)
+    }
+
+    fun openDatabase(masterPassword: String) {
+      this@BleService.openDatabase(masterPassword)
+    }
+
+    fun start(userId: String) {
+      this@BleService.start(userId)
     }
   }
 
@@ -135,14 +154,14 @@ class BleService : Service() {
   private val bleDataExchangeManager = object : BleManager.BleDataExchangeManager {
     override fun onUserConnected(userId: String) {
       Log.d("BleService", "onUserConnected: $userId")
-      val devices = allDevices.value ?: emptyList()
+      val devices = allDevices?.value ?: emptyList()
       if (!devices.any { it.userId == userId }) {
-        deviceRepository.insert(Device(userId, 0, System.currentTimeMillis(), true))
+        deviceRepository?.insert(Device(userId, 0, System.currentTimeMillis(), true))
         val intent = Intent(ACTION_DEVICE)
         sendBroadcast(intent)
       } else {
         devices.find { it.userId == userId }?.let {
-          deviceRepository.update(
+          deviceRepository?.update(
             it.copy(
               lastSeen = System.currentTimeMillis(),
               connected = true
@@ -212,7 +231,7 @@ class BleService : Service() {
           messagesHashes[message.senderId]?.add(hash)
           message.content = encryptionManager.decrypt(message.content)
 
-          messageRepository.insert(
+          messageRepository?.insert(
             com.cstef.meshlink.db.entities.Message(
               message.id,
               message.senderId,
@@ -269,10 +288,10 @@ class BleService : Service() {
 
     override fun onUserDisconnected(userId: String) {
       Log.d("MainViewModel", "onUserDisconnected: $userId")
-      val devices = allDevices.value ?: return
+      val devices = allDevices?.value ?: return
       devices.map { it.userId }.indexOf(userId).let {
         if (it != -1) {
-          deviceRepository.update(devices[it].copy(connected = false))
+          deviceRepository?.update(devices[it].copy(connected = false))
         }
       }
       val intent = Intent(ACTION_DEVICE)
@@ -284,11 +303,11 @@ class BleService : Service() {
     }
 
     override fun onUserRssiReceived(userId: String, rssi: Int) {
-      val devices = allDevices.value ?: return
+      val devices = allDevices?.value ?: return
       if (devices.isNotEmpty()) {
         val device = devices[0]
         if (device.rssi != rssi) {
-          deviceRepository.update(device.copy(rssi = rssi))
+          deviceRepository?.update(device.copy(rssi = rssi))
           val intent = Intent(ACTION_DEVICE)
           sendBroadcast(intent)
         }
@@ -318,10 +337,13 @@ class BleService : Service() {
   lateinit var bleManager: BleManager
   private lateinit var encryptionManager: EncryptionManager
 
-  lateinit var allMessages: LiveData<List<com.cstef.meshlink.db.entities.Message>>
-  lateinit var allDevices: LiveData<List<Device>>
-  lateinit var messageRepository: MessageRepository
-  lateinit var deviceRepository: DeviceRepository
+  var allMessages: LiveData<List<com.cstef.meshlink.db.entities.Message>>? = null
+  var allDevices: LiveData<List<Device>>? = null
+  val isDatabaseOpen = MutableLiveData(false)
+  val isDatabaseLoading = MutableLiveData(false)
+  val databaseError = MutableLiveData("")
+  var messageRepository: MessageRepository? = null
+  var deviceRepository: DeviceRepository? = null
 
   override fun onDestroy() {
     super.onDestroy()
@@ -332,30 +354,36 @@ class BleService : Service() {
     super.onCreate()
     handlerThread.start()
     handler = Handler(handlerThread.looper)
-    encryptionManager = EncryptionManager()
+    encryptionManager = EncryptionManager(application)
     bleManager = BleManager(applicationContext, bleDataExchangeManager, encryptionManager, handler)
-    val db = AppDatabase.getInstance(application)
+  }
+
+
+  fun openDatabase(masterPassword: String) {
+    AppDatabase.destroyInstance()
+    val db = AppDatabase.getInstance(application, masterPassword)
     val messageDao = db.messageDao()
     val deviceDao = db.deviceDao()
     messageRepository = MessageRepository(messageDao)
-    deviceRepository = DeviceRepository(deviceDao)
-    allMessages = messageRepository.allMessages
-    allDevices = deviceRepository.allDevices
+    deviceRepository = DeviceRepository(deviceDao, isDatabaseOpen, isDatabaseLoading, databaseError)
+    deviceRepository?.checkDatabaseWorking()
+    allMessages = messageRepository?.allMessages
+    allDevices = deviceRepository?.allDevices
   }
 
-  fun startBle(userId: String) {
+  fun start(userId: String) {
     Log.d("BleService", "startBle")
     this.userId = userId
     if (!bleManager.isStarted.value) bleManager.start(userId)
   }
 
-  fun stopBle() {
+  fun stop() {
     if (bleManager.isStarted.value) bleManager.stop()
   }
 
   fun sendMessage(message: Message) {
     if (message.recipientId != null) {
-      messageRepository.insert(
+      messageRepository?.insert(
         com.cstef.meshlink.db.entities.Message(
           message.id,
           message.senderId,
