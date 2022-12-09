@@ -16,7 +16,7 @@ import net.sqlcipher.database.SupportFactory
     Device::class,
     Message::class,
   ],
-  version = 1,
+  version = 12,
   exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -34,7 +34,7 @@ abstract class AppDatabase : RoomDatabase() {
         INSTANCE = Room.databaseBuilder(
           context,
           AppDatabase::class.java, "meshlink.db"
-        ).openHelperFactory(factory).build()
+        ).openHelperFactory(factory).fallbackToDestructiveMigration().build()
       }
       return INSTANCE!!
     }

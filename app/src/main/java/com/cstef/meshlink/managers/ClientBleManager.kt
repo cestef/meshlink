@@ -31,6 +31,7 @@ import java.security.KeyFactory
 import java.security.spec.X509EncodedKeySpec
 import java.text.DecimalFormat
 import java.util.*
+import kotlin.math.absoluteValue
 
 class ClientBleManager(
   private val context: Context,
@@ -40,7 +41,6 @@ class ClientBleManager(
   handler: Handler
 ) {
 
-  private var notification: NotificationCompat.Builder? = null
   private var userId: String? = null
   private val moshi = MoshiPack()
 
@@ -57,7 +57,6 @@ class ClientBleManager(
   data class ChunkSendingState(
     var chunksSent: Int,
     val chunksTotal: Int,
-    val builder: NotificationCompat.Builder,
     val userId: String,
     val notificationId: Int,
     val startTime: Long = System.currentTimeMillis(),
@@ -126,7 +125,8 @@ class ClientBleManager(
                 if (serverId != null) {
                   if (sendingChunks.containsKey(gatt.device.address)) {
                     sendingChunks.remove(gatt.device.address)
-                    val notificationId = serverId.hashCode()
+                    val chunkSendingState = sendingChunks[gatt.device.address]
+                    val notificationId = chunkSendingState?.notificationId ?: serverId.hashCode()
                     NotificationManagerCompat.from(context).cancel(notificationId)
                     dataExchangeManager.onMessageSendFailed(serverId, "Connection error")
                   }
@@ -143,7 +143,8 @@ class ClientBleManager(
                 if (serverId != null) {
                   if (sendingChunks.containsKey(gatt.device.address)) {
                     sendingChunks.remove(gatt.device.address)
-                    val notificationId = serverId.hashCode()
+                    val chunkSendingState = sendingChunks[gatt.device.address]
+                    val notificationId = chunkSendingState?.notificationId ?: serverId.hashCode()
                     NotificationManagerCompat.from(context).cancel(notificationId)
                     dataExchangeManager.onMessageSendFailed(serverId, "Connection error")
                   }
@@ -268,6 +269,9 @@ class ClientBleManager(
       chunksOperationQueue.operationComplete()
 
       val chunkState = sendingChunks[gatt?.device?.address]
+      val builder = NotificationCompat.Builder(context, "data")
+        .setSmallIcon(R.drawable.ic_baseline_bluetooth_24)
+
       if (chunkState != null) {
         Log.d(
           "ClientBleManager",
@@ -280,38 +284,42 @@ class ClientBleManager(
               "ClientBleManager",
               "onCharacteristicWrite: finished sending ${chunkState.chunksSent}/${chunkState.chunksTotal} chunks"
             )
-            chunkState.builder
-              .setContentTitle("Upload complete")
-              .setContentText("")
-              .setProgress(0, 0, false)
-              .setOngoing(false)
-              .setAutoCancel(true)
-              .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-
+            context.unregisterReceiver(chunkState.receiver)
             val notificationManager = NotificationManagerCompat.from(context)
-            notificationManager.notify(chunkState.notificationId, chunkState.builder.build())
+            notificationManager.cancel(chunkState.notificationId)
+            sendingChunks.remove(gatt?.device?.address)
             callbackHandler.post {
               dataExchangeManager.onMessageSent(chunkState.userId)
             }
-            sendingChunks.remove(gatt?.device?.address)
-            // Unregister the receiver
-            context.unregisterReceiver(chunkState.receiver)
           } else {
-            chunkState.builder.setProgress(
-              chunkState.chunksTotal, chunkState.chunksSent, false
-            ).setOngoing(true)
             val timeDiff = System.currentTimeMillis() - chunkState.startTime
             val speed = (chunkState.chunksSent * Chunk.CHUNK_SIZE / 1000.0) / (timeDiff / 1000.0)
             val df = DecimalFormat("#.##")
             df.roundingMode = RoundingMode.CEILING
-            chunkState.builder.setContentText(
-              "Average speed: ${
-                df.format(speed).toDouble()
-              } kB/s"
-            )
-            chunkState.builder.mActions.clear()
+            builder
+              .setContentTitle("Sending data")
+              .setContentText(
+                "Average speed: ${
+                  df.format(speed).toDouble()
+                } kB/s"
+              )
+              .setProgress(
+                chunkState.chunksTotal, chunkState.chunksSent, false
+              )
+              .setOngoing(true)
+              .setSilent(true)
+              .addAction(
+                com.google.android.material.R.drawable.ic_m3_chip_close,
+                "Cancel",
+                PendingIntent.getBroadcast(
+                  context,
+                  0,
+                  Intent("cancel_sending"),
+                  PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+              )
             val notificationManager = NotificationManagerCompat.from(context)
-            notificationManager.notify(chunkState.notificationId, chunkState.builder.build())
+            notificationManager.notify(chunkState.notificationId, builder.build())
           }
         } else {
           Log.e("ClientBleManager", "onCharacteristicWrite: chunkState == null")
@@ -402,9 +410,8 @@ class ClientBleManager(
     Log.d("ClientBleManager", "writeData: chunks.size = ${chunks.size}")
     // Create a notification
     if (chunks.size > 2) {
-      notification = NotificationCompat.Builder(context, "data")
+      val builder = NotificationCompat.Builder(context, "data")
         .setSmallIcon(R.drawable.ic_baseline_bluetooth_24).setContentTitle("Sending data")
-        .setContentText("Sending data to ${message.recipientId}")
         .setPriority(NotificationCompat.PRIORITY_DEFAULT).setSilent(true).setOngoing(true)
         .setProgress(chunks.size, 0, false)
         .addAction(
@@ -418,9 +425,9 @@ class ClientBleManager(
           )
         )
       val notificationManager = NotificationManagerCompat.from(context)
-      val notificationId = message.recipientId.hashCode()
+      val notificationId = message.id.toByteArray().sum().absoluteValue
       notificationManager.notify(
-        notificationId, notification!!.build()
+        notificationId, builder.build()
       )
       val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -435,8 +442,7 @@ class ClientBleManager(
       sendingChunks[device.address] = ChunkSendingState(
         0,
         chunks.size,
-        notification!!,
-        message.recipientId!!,
+        message.recipientId ?: "",
         notificationId,
         System.currentTimeMillis(),
         receiver

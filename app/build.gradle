@@ -3,9 +3,24 @@ plugins {
   id 'org.jetbrains.kotlin.android'
   id 'kotlin-kapt'
 }
-
+def keystorePropertiesFile = file("../keystore.properties")
+def keystoreProperties = new Properties()
+keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 android {
-
+  signingConfigs {
+    release {
+      storeFile = file(keystoreProperties['storeFile'])
+      storePassword = keystoreProperties['storePassword']
+      keyAlias = keystoreProperties['keyAlias']
+      keyPassword = keystoreProperties['keyPassword']
+    }
+    debug {
+      storeFile = file(keystoreProperties['storeFile'])
+      storePassword = keystoreProperties['storePassword']
+      keyAlias = keystoreProperties['keyAlias']
+      keyPassword = keystoreProperties['keyPassword']
+    }
+  }
   namespace 'com.cstef.meshlink'
   compileSdk 33
 
@@ -24,6 +39,7 @@ android {
     versionCode 11
     versionName "1.1.4"
     testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    signingConfig signingConfigs.release
   }
 
   buildTypes {
@@ -81,4 +97,6 @@ dependencies {
   implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4'
   implementation "net.zetetic:android-database-sqlcipher:4.5.2"
   implementation "androidx.sqlite:sqlite:2.2.0"
+  implementation "androidx.biometric:biometric:1.1.0"
+  implementation "androidx.biometric:biometric-ktx:1.2.0-alpha05"
 }

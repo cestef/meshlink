@@ -398,7 +398,7 @@ class MainActivity : AppCompatActivity() {
 
   fun stopBle() {
     bleService?.stop()
-    Toast.makeText(this, "Service Started", Toast.LENGTH_SHORT).show()
+    Toast.makeText(this, "Service Stopped", Toast.LENGTH_SHORT).show()
   }
 
   private fun createNotificationChannels() {

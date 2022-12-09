@@ -7,6 +7,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Share
@@ -86,7 +87,7 @@ fun ImageCard(isMine: Boolean, content: String) {
           ) {
             Icon(
               imageVector = Icons.Rounded.Share,
-              contentDescription = null,
+              contentDescription = "Share image",
               tint = if (isSystemInDarkTheme()) DarkColors.primary else LightColors.primary
             )
           }
@@ -95,7 +96,7 @@ fun ImageCard(isMine: Boolean, content: String) {
             modifier = Modifier
               .padding(8.dp)
               .fillMaxSize()
-              .clip(MaterialTheme.shapes.medium)
+              .clip(RoundedCornerShape(10.dp))
               .clickable {
                 setFullScreen(false)
               },

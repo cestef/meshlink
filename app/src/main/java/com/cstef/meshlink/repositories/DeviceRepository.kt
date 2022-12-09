@@ -41,6 +41,7 @@ class DeviceRepository(
       isDatabaseOpen.value = asyncCheckDatabaseWorking().await()
       if (isDatabaseOpen.value == true) {
         databaseError.value = ""
+        updateAllConnected(false)
       } else {
         databaseError.value = "Incorrect password"
       }

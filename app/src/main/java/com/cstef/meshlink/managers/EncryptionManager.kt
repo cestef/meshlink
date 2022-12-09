@@ -6,6 +6,7 @@ import android.security.keystore.KeyProperties
 import android.util.Base64
 import java.math.BigInteger
 import java.security.*
+import java.security.spec.X509EncodedKeySpec
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -141,5 +142,13 @@ class EncryptionManager {
     val md = MessageDigest.getInstance("SHA-256")
     md.update(key.encoded)
     return md5(md.digest()).chunked(4).joinToString("-")
+  }
+
+  fun getPublicKey(key: ByteArray?): PublicKey {
+    return KeyFactory.getInstance("RSA").generatePublic(
+      X509EncodedKeySpec(
+        key
+      )
+    )
   }
 }

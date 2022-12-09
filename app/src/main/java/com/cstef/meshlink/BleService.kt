@@ -23,6 +23,7 @@ import com.cstef.meshlink.util.struct.Message
 import com.daveanthonythomas.moshipack.MoshiPack
 import java.security.PublicKey
 import java.util.*
+import android.util.Base64
 
 
 class BleService : Service() {
@@ -82,10 +83,18 @@ class BleService : Service() {
 //      this@BleService.sendIsWriting(userId, isWriting)
 //    }
 
-    fun getPublicKeySignature(otherUserId: String): String? {
+    fun getPublicKeySignature(otherUserId: String): String {
       val publicKey =
-        if (otherUserId == userId) encryptionManager.publicKey else publicKeys[otherUserId]
-      return publicKey?.let { encryptionManager.getPublicKeySignature(it) }
+        if (otherUserId == userId)
+          encryptionManager.publicKey
+        else encryptionManager.getPublicKey(
+          Base64.decode(
+            allDevices.value?.find { it.userId == otherUserId }?.publicKey,
+            Base64.DEFAULT
+          )
+        )
+      Log.d("BleService", "publicKey: $publicKey")
+      return encryptionManager.getPublicKeySignature(publicKey)
     }
 
     fun blockUser(userId: String) {
@@ -147,7 +156,6 @@ class BleService : Service() {
   }
 
   val messagesHashes: MutableMap<String, MutableList<String>> = mutableMapOf()
-  val publicKeys: MutableMap<String, PublicKey> = mutableMapOf()
   val chunks: MutableMap<String, MutableMap<Int, MutableList<Chunk>>> =
     mutableMapOf() // userId -> messageId -> chunks
 
@@ -174,11 +182,29 @@ class BleService : Service() {
     override fun onUserPublicKeyReceived(userId: String, publicKey: PublicKey) {
       Log.d("BleService", "onUserPublicKeyReceived: $userId")
       // if the public key is already known, ask the user if they want to update it
-      if (publicKeys.containsKey(userId)) {
-        Log.d("BleService", "public key already known")
+      val devices = allDevices?.value ?: emptyList()
+      val device = devices.find { it.userId == userId }
+      if (device != null) {
+        deviceRepository?.update(
+          device.copy(
+            publicKey = Base64.encodeToString(
+              publicKey.encoded,
+              Base64.DEFAULT
+            )
+          )
+        )
       } else {
-        Log.d("BleService", "public key unknown")
-        publicKeys[userId] = publicKey
+        deviceRepository?.insert(
+          Device(
+            userId,
+            publicKey = Base64.encodeToString(
+              publicKey.encoded,
+              Base64.DEFAULT
+            ),
+            lastSeen = System.currentTimeMillis(),
+            connected = true
+          )
+        )
       }
     }
 
@@ -299,7 +325,14 @@ class BleService : Service() {
     }
 
     override fun getPublicKeyForUser(recipientId: String): PublicKey? {
-      return publicKeys[recipientId]
+      return allDevices?.value?.find { it.userId == recipientId }?.publicKey?.let {
+        encryptionManager.getPublicKey(
+          Base64.decode(
+            it,
+            Base64.DEFAULT
+          )
+        )
+      }
     }
 
     override fun onUserRssiReceived(userId: String, rssi: Int) {
