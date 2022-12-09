@@ -14,4 +14,4 @@ To read more about MeshLink, visit [meshlink.cstef.dev](https://meshlink.cstef.d
 -   **🔗 Decentralized:** No central server, no central authority.
 -   **📡 Offline:** MeshLink uses [Bluetooth Low Energy](https://en.wikipedia.org/wiki/Bluetooth_Low_Energy) to communicate with other devices.
 -   **📖 Open-source:** MeshLink is open-source and available on [GitHub](https://github.com/cestef/meshlink)
--   **📦 Lightweight:** MeshLink is only 1.5 MB in size.
+-   **📦 Lightweight:** MeshLink is only ~5 MB in size.
