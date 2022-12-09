@@ -17,8 +17,9 @@ const val AVATAR_SIZE = 36
 
 // awesome-horse-123
 
-// 977 words
+// 979 words
 val adjectives = listOf(
+  "awesome",
   "sophisticated",
   "expressive",
   "transparent",
@@ -735,7 +736,6 @@ val adjectives = listOf(
   "senior",
   "serene",
   "severe",
-  "sexual",
   "shabby",
   "shady",
   "shaggy",
@@ -761,6 +761,7 @@ val adjectives = listOf(
   "skinny",
   "sleepy",
   "slender",
+  "splendid",
   "slight",
   "slim",
   "slimy",
@@ -991,6 +992,7 @@ val adjectives = listOf(
 
 // 1844 words
 val nouns = listOf(
+  "volcano",
   "able",
   "accord",
   "act",
