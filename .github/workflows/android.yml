@@ -21,6 +21,22 @@ jobs:
           alias: ${{ secrets.ANDROID_KEY_ALIAS }}
           keyStorePassword: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      - uses: jungwinter/split@v1
+        id: signed_files
+        with:
+          msg: ${{ steps.sign_app.signedReleaseFiles }}
+          separator: ':'
+      - name: Upload APKs
+          uses: actions/upload-artifact@v2
+          with:
+            name: signed-apks
+            path: |
+              ${{ steps.signed_files.outputs._0 }}
+              ${{ steps.signed_files.outputs._1 }}
+              ${{ steps.signed_files.outputs._2 }}
+              ${{ steps.signed_files.outputs._3 }}
+              ${{ steps.signed_files.outputs._4 }}
+              ${{ steps.signed_files.outputs._5 }}
       - name: Release APKs
         uses: "marvinpinto/action-automatic-releases@latest"
         with:
@@ -28,9 +44,9 @@ jobs:
           automatic_release_tag: "${{ github.ref }}"
           prerelease: true
           files: |
-            ${{ steps.sign_apk.signedReleaseFile0 }}
-            ${{ steps.sign_apk.signedReleaseFile1 }}
-            ${{ steps.sign_apk.signedReleaseFile2 }}
-            ${{ steps.sign_apk.signedReleaseFile3 }}
-            ${{ steps.sign_apk.signedReleaseFile4 }}
-            ${{ steps.sign_apk.signedReleaseFile5 }}
+            ${{ steps.signed_files.outputs._0 }}
+            ${{ steps.signed_files.outputs._1 }}
+            ${{ steps.signed_files.outputs._2 }}
+            ${{ steps.signed_files.outputs._3 }}
+            ${{ steps.signed_files.outputs._4 }}
+            ${{ steps.signed_files.outputs._5 }}
