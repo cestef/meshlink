@@ -23,7 +23,7 @@ android {
   }
   namespace 'com.cstef.meshlink'
   compileSdk 33
-
+  compileSdkVersion 33
   buildFeatures {
     compose true
   }
