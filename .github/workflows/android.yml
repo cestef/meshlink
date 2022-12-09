@@ -9,10 +9,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Build APK
+      - name: Build APKs
         id: build
         run: bash ./gradlew assembleRelease
-      - name: Sign APK
+      - name: Sign APKs
         id: sign_apk
         uses: r0adkll/sign-android-release@v1
         with:
@@ -21,7 +21,7 @@ jobs:
           alias: ${{ secrets.ANDROID_KEY_ALIAS }}
           keyStorePassword: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
-      - name: Example Release
+      - name: Release APKs
         uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
