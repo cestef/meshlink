@@ -1,52 +1,61 @@
 name: Release Build
 on:
-    push:
-        tags:
-            - "v*"
+  push:
+    tags:
+      - 'v*'
 jobs:
-    Build:
-        name: Build/Sign APK
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v2
-            - name: Build APKs
-              id: build
-              run: bash ./gradlew assembleRelease
-            - name: Sign APKs
-              id: sign_apk
-              uses: r0adkll/sign-android-release@v1
-              with:
-                  releaseDirectory: app/build/outputs/apk/release
-                  signingKeyBase64: ${{ secrets.ANDROID_SIGNING_KEY }}
-                  alias: ${{ secrets.ANDROID_KEY_ALIAS }}
-                  keyStorePassword: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-                  keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
-            - uses: jungwinter/split@v1
-              id: signed_files
-              with:
-                  msg: ${{ steps.sign_app.signedReleaseFiles }}
-                  seperator: ":"
-            - name: Upload APKs
-              uses: actions/upload-artifact@v2
-              with:
-                  name: signed-apks
-                  path: |
-                      ${{ steps.signed_files.outputs._0 }}
-                      ${{ steps.signed_files.outputs._1 }}
-                      ${{ steps.signed_files.outputs._2 }}
-                      ${{ steps.signed_files.outputs._3 }}
-                      ${{ steps.signed_files.outputs._4 }}
-                      ${{ steps.signed_files.outputs._5 }}
-            - name: Release APKs
-              uses: "marvinpinto/action-automatic-releases@latest"
-              with:
-                  repo_token: "${{ secrets.GITHUB_TOKEN }}"
-                  automatic_release_tag: "${{ github.ref }}"
-                  prerelease: true
-                  files: |
-                      ${{ steps.signed_files.outputs._0 }}
-                      ${{ steps.signed_files.outputs._1 }}
-                      ${{ steps.signed_files.outputs._2 }}
-                      ${{ steps.signed_files.outputs._3 }}
-                      ${{ steps.signed_files.outputs._4 }}
-                      ${{ steps.signed_files.outputs._5 }}
+  Build:
+    name: Build/Sign APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Get Tag
+        id: var
+        run: echo ::set-output name=tag::${GITHUB_REF#refs/*/}
+
+      - name: Build APK
+        id: build
+        run: bash ./gradlew assembleRelease
+
+      - name: Sign APK
+        id: sign_apk
+        uses: r0adkll/sign-android-release@v1
+        with:
+          releaseDirectory: app/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.ANDROID_SIGNING_KEY }}
+          alias: ${{ secrets.ANDROID_KEY_ALIAS }}
+          keyStorePassword: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      - name: Make artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: app-release-signed
+          path: ${{steps.sign_apk.outputs.signedReleaseFile}}
+
+      - name: Build Changelog
+        id: changelog
+        uses: ardalanamini/auto-changelog@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: ${{ steps.changelog.outputs.changelog }} &#x20;
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Upload APK
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{steps.sign_apk.outputs.signedReleaseFile}}
+          asset_name: app-release-signed-${{ steps.var.outputs.tag }}.apk
+          asset_content_type: application/zip
