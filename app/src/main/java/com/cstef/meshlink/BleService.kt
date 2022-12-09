@@ -354,7 +354,7 @@ class BleService : Service() {
     super.onCreate()
     handlerThread.start()
     handler = Handler(handlerThread.looper)
-    encryptionManager = EncryptionManager(application)
+    encryptionManager = EncryptionManager()
     bleManager = BleManager(applicationContext, bleDataExchangeManager, encryptionManager, handler)
   }
 
