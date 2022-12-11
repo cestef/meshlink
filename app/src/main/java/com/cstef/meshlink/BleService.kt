@@ -7,6 +7,7 @@ import android.os.Binder
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
+import android.util.Base64
 import android.util.Log
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
@@ -23,7 +24,6 @@ import com.cstef.meshlink.util.struct.Message
 import com.daveanthonythomas.moshipack.MoshiPack
 import java.security.PublicKey
 import java.util.*
-import android.util.Base64
 
 
 class BleService : Service() {
@@ -43,12 +43,15 @@ class BleService : Service() {
   }
 
   inner class BleServiceBinder : Binder() {
+    val isAdvertising
+      get() = bleManager.isAdvertising
     val service: BleService
       get() = this@BleService
 
     val isBleStarted
       get() = bleManager.isStarted
-
+    val isScanning
+      get() = bleManager.isScanning
     val isDatabaseOpen: LiveData<Boolean>
       get() = this@BleService.isDatabaseOpen
     val isDatabaseOpening: LiveData<Boolean>
@@ -57,9 +60,13 @@ class BleService : Service() {
       get() = this@BleService.databaseError
     val allMessages: LiveData<List<com.cstef.meshlink.db.entities.Message>>
       get() = this@BleService.allMessages ?: throw Exception("Database not open")
-
     val allDevices: LiveData<List<Device>>
       get() = this@BleService.allDevices ?: throw Exception("Database not open")
+
+    fun setUserId(id: String) {
+      userId = id
+      bleManager.setUserId(id)
+    }
 
     fun sendMessage(receiverId: String, message: String, type: String = Message.Type.TEXT) {
       this@BleService.sendMessage(
@@ -75,8 +82,9 @@ class BleService : Service() {
       )
     }
 
-    fun addDevice(userId: String) {
-      bleDataExchangeManager.onUserConnected(userId)
+    fun addDevice(userId: String, address: String, publicKey: PublicKey) {
+      bleDataExchangeManager.onUserConnected(userId, address)
+      bleDataExchangeManager.onUserPublicKeyReceived(userId, address, publicKey)
     }
 
 //    fun sendIsWriting(userId: String, isWriting: Boolean) {
@@ -84,17 +92,21 @@ class BleService : Service() {
 //    }
 
     fun getPublicKeySignature(otherUserId: String): String {
-      val publicKey =
-        if (otherUserId == userId)
-          encryptionManager.publicKey
-        else encryptionManager.getPublicKey(
-          Base64.decode(
-            allDevices.value?.find { it.userId == otherUserId }?.publicKey,
-            Base64.DEFAULT
+      val device = allDevices.value?.find { it.userId == otherUserId }
+      return if (otherUserId == userId) {
+        encryptionManager.getPublicKeySignature(encryptionManager.publicKey)
+      } else if (device != null) {
+        encryptionManager.getPublicKeySignature(
+          encryptionManager.getPublicKey(
+            Base64.decode(
+              device.publicKey,
+              Base64.DEFAULT
+            )
           )
         )
-      Log.d("BleService", "publicKey: $publicKey")
-      return encryptionManager.getPublicKeySignature(publicKey)
+      } else {
+        return "No public key for user $otherUserId"
+      }
     }
 
     fun blockUser(userId: String) {
@@ -150,8 +162,37 @@ class BleService : Service() {
       this@BleService.openDatabase(masterPassword)
     }
 
-    fun start(userId: String) {
-      this@BleService.start(userId)
+    fun openServer() {
+      bleManager.openServer()
+    }
+
+    fun closeServer() {
+      bleManager.closeServer()
+    }
+
+    fun startScanning() {
+      // check permissions
+      bleManager.startScanning()
+    }
+
+    fun stopScanning() {
+      bleManager.stopScanning()
+    }
+
+    fun startAdvertising() {
+      bleManager.startAdvertising()
+    }
+
+    fun stopAdvertising() {
+      bleManager.stopAdvertising()
+    }
+
+    fun startConnectOrUpdateKnownDevices() {
+      bleManager.startConnectOrUpdateKnownDevices()
+    }
+
+    fun stopConnectOrUpdateKnownDevices() {
+      bleManager.stopConnectOrUpdateKnownDevices()
     }
   }
 
@@ -160,11 +201,19 @@ class BleService : Service() {
     mutableMapOf() // userId -> messageId -> chunks
 
   private val bleDataExchangeManager = object : BleManager.BleDataExchangeManager {
-    override fun onUserConnected(userId: String) {
+    override fun getKnownDevices(): List<Device> {
+      return allDevices?.value ?: emptyList()
+    }
+
+    override fun getAddressForUserId(userId: String): String {
+      return allDevices?.value?.find { it.userId == userId }?.address ?: ""
+    }
+
+    override fun onUserConnected(userId: String, address: String) {
       Log.d("BleService", "onUserConnected: $userId")
       val devices = allDevices?.value ?: emptyList()
       if (!devices.any { it.userId == userId }) {
-        deviceRepository?.insert(Device(userId, 0, System.currentTimeMillis(), true))
+        deviceRepository?.insert(Device(userId, address, 0, System.currentTimeMillis(), true))
         val intent = Intent(ACTION_DEVICE)
         sendBroadcast(intent)
       } else {
@@ -179,7 +228,7 @@ class BleService : Service() {
       }
     }
 
-    override fun onUserPublicKeyReceived(userId: String, publicKey: PublicKey) {
+    override fun onUserPublicKeyReceived(userId: String, address: String, publicKey: PublicKey) {
       Log.d("BleService", "onUserPublicKeyReceived: $userId")
       // if the public key is already known, ask the user if they want to update it
       val devices = allDevices?.value ?: emptyList()
@@ -197,6 +246,7 @@ class BleService : Service() {
         deviceRepository?.insert(
           Device(
             userId,
+            address,
             publicKey = Base64.encodeToString(
               publicKey.encoded,
               Base64.DEFAULT
@@ -221,6 +271,13 @@ class BleService : Service() {
         "BleService",
         "onChunkReceived: chunk.index: ${chunk.index}, chunk.data.size: ${chunk.data.size}, chunk.messageId: ${chunk.messageId}"
       )
+      // is user blocked?
+      val devices = allDevices?.value ?: emptyList()
+      val device = devices.find { it.userId == getUserIdForAddress(address) }
+      if (device != null && device.blocked) {
+        Log.d("BleService", "onChunkReceived: user is blocked")
+        return
+      }
       if (chunks.containsKey(address)) {
         chunks[address]?.let { chunks ->
           if (chunks.containsKey(chunk.messageId)) {
@@ -255,6 +312,7 @@ class BleService : Service() {
         if (message.recipientId == userId) {
           //Log.d("BleService", "onDataReceived: $bleData")
           messagesHashes[message.senderId]?.add(hash)
+          // Check if the user is blocked
           message.content = encryptionManager.decrypt(message.content)
 
           messageRepository?.insert(
@@ -402,16 +460,6 @@ class BleService : Service() {
     deviceRepository?.checkDatabaseWorking()
     allMessages = messageRepository?.allMessages
     allDevices = deviceRepository?.allDevices
-  }
-
-  fun start(userId: String) {
-    Log.d("BleService", "startBle")
-    this.userId = userId
-    if (!bleManager.isStarted.value) bleManager.start(userId)
-  }
-
-  fun stop() {
-    if (bleManager.isStarted.value) bleManager.stop()
   }
 
   fun sendMessage(message: Message) {

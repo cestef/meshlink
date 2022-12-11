@@ -18,7 +18,6 @@ import android.os.Handler
 import android.os.ParcelUuid
 import android.util.Base64
 import android.util.Log
-import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -26,6 +25,7 @@ import com.cstef.meshlink.R
 import com.cstef.meshlink.util.BleUuid
 import com.cstef.meshlink.util.struct.*
 import com.daveanthonythomas.moshipack.MoshiPack
+import kotlinx.coroutines.*
 import java.math.RoundingMode
 import java.security.KeyFactory
 import java.security.spec.X509EncodedKeySpec
@@ -38,9 +38,11 @@ class ClientBleManager(
   private val dataExchangeManager: BleManager.BleDataExchangeManager,
   private val callbackHandler: Handler,
   private val encryptionManager: EncryptionManager,
-  handler: Handler
+  handler: Handler,
+  private val parentManager: BleManager
 ) {
 
+  private var connectLoopJob: Job? = null
   private var userId: String? = null
   private val moshi = MoshiPack()
 
@@ -176,12 +178,16 @@ class ClientBleManager(
             gatt.close()
           }
         }
+        else -> {
+          Log.w("ClientBleManager", "onConnectionStateChange: unknown state $newState")
+        }
       }
     }
 
     @SuppressLint("MissingPermission")
     override fun onMtuChanged(gatt: BluetoothGatt?, mtu: Int, status: Int) {
       super.onMtuChanged(gatt, mtu, status)
+      Log.d("ClientBleManager", "onMtuChanged: $mtu")
       operationQueue.operationComplete()
       if (status == BluetoothGatt.GATT_SUCCESS) {
         if (gatt != null) operationQueue.execute {
@@ -196,6 +202,10 @@ class ClientBleManager(
     @SuppressLint("MissingPermission")
     override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
       super.onServicesDiscovered(gatt, status)
+      Log.d(
+        "ClientBleManager",
+        "onServicesDiscovered: $status, success: ${status == BluetoothGatt.GATT_SUCCESS}"
+      )
       operationQueue.operationComplete()
       if (status == BluetoothGatt.GATT_SUCCESS) {
         // request data from remote BLE server
@@ -229,9 +239,11 @@ class ClientBleManager(
             if (gatt != null) {
               connectedServersAddresses[userId] = gatt.device.address
               operationQueue.execute { gatt.readPublicKey() }
-            }
-            callbackHandler.post {
-              userId?.let { dataExchangeManager.onUserConnected(it) }
+              callbackHandler.post {
+                userId?.let { dataExchangeManager.onUserConnected(it, gatt.device.address) }
+              }
+            } else {
+              Log.e("ClientBleManager", "onCharacteristicRead: gatt == null")
             }
           }
           BleUuid.USER_PUBLIC_KEY_UUID -> {
@@ -243,10 +255,14 @@ class ClientBleManager(
               "ClientBleManager",
               "onCharacteristicRead: publicKey = $publicKey gatt == null: ${gatt == null}"
             )
-            callbackHandler.post {
-              dataExchangeManager.onUserPublicKeyReceived(
-                msg.userId, publicKey
-              )
+            if (gatt != null) {
+              callbackHandler.post {
+                dataExchangeManager.onUserPublicKeyReceived(
+                  msg.userId, gatt.device.address, publicKey
+                )
+              }
+            } else {
+              Log.e("ClientBleManager", "onCharacteristicRead: gatt == null")
             }
           }
         }
@@ -325,32 +341,6 @@ class ClientBleManager(
           Log.e("ClientBleManager", "onCharacteristicWrite: chunkState == null")
         }
       }
-    }
-  }
-
-  fun start(myUserId: String) {
-    userId = myUserId
-    if (adapter.isBleOn) {
-      if (ActivityCompat.checkSelfPermission(
-          context, Manifest.permission.BLUETOOTH_SCAN
-        ) == PackageManager.PERMISSION_GRANTED
-        ||
-        (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && ActivityCompat.checkSelfPermission(
-          context, Manifest.permission.BLUETOOTH_ADMIN
-        ) == PackageManager.PERMISSION_GRANTED)
-      ) {
-        scanner?.startScan(scanFilters, scanSettings, scanCallback)
-        Log.d("ClientBleManager", "Started scanning")
-      } else {
-        Log.e("ClientBleManager", "Permission not granted")
-        Toast.makeText(context, "Permission not granted", Toast.LENGTH_SHORT).show()
-      }
-    } else {
-      Toast.makeText(context, "Bluetooth LE is not enabled", Toast.LENGTH_SHORT).show()
-      Log.d(
-        "ClientBleManager",
-        "start: Bluetooth is not on: adapter=$adapter isEnabled=${adapter?.isEnabled}"
-      )
     }
   }
 
@@ -515,6 +505,64 @@ class ClientBleManager(
     } else {
       Log.w("ClientBleManager", "disconnect: deviceAddress is null")
     }
+  }
+
+  @SuppressLint("MissingPermission")
+  fun startScanning() {
+    if (adapter.isBleOn) {
+      scanner?.startScan(scanFilters, scanSettings, scanCallback)
+      parentManager.isScanning.value = true
+      Log.d("ClientBleManager", "startScanning: started")
+    } else {
+      Log.w("ClientBleManager", "startScanning: BLE is off")
+    }
+  }
+
+  @SuppressLint("MissingPermission")
+  fun stopScanning() {
+    scanner?.stopScan(scanCallback)
+    parentManager.isScanning.value = false
+    Log.d("ClientBleManager", "stopScanning: stopped")
+  }
+
+  fun startConnectOrUpdateKnownDevicesLoop() {
+    if (connectLoopJob == null) {
+      connectLoopJob = CoroutineScope(Dispatchers.IO).launch {
+        while (true) {
+          delay(15000)
+          val knownDevices = dataExchangeManager.getKnownDevices()
+          knownDevices.forEach { device ->
+            if (connectedServersAddresses[device.userId] == null) {
+              Log.d(
+                "ClientBleManager",
+                "startConnectOrUpdateKnownDevicesLoop: Connecting to ${device.userId}"
+              )
+              connect(device.address)
+            }
+          }
+        }
+      }
+    }
+  }
+
+  fun stopConnectOrUpdateKnownDevicesLoop() {
+    connectLoopJob?.cancel()
+    connectLoopJob = null
+  }
+
+  @SuppressLint("MissingPermission")
+  fun connect(address: String) {
+    val device = adapter?.getRemoteDevice(address)
+    if (device != null) {
+      device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
+      Log.d("ClientBleManager", "connect: connecting to $address")
+    } else {
+      Log.w("ClientBleManager", "connect: device is null")
+    }
+  }
+
+  fun setUserId(id: String) {
+    userId = id
   }
 
 //  @SuppressLint("MissingPermission")

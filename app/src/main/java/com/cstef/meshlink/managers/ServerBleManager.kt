@@ -1,19 +1,15 @@
 package com.cstef.meshlink.managers
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.*
 import android.bluetooth.le.AdvertiseCallback
 import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
 import android.content.Context
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Handler
 import android.os.ParcelUuid
 import android.util.Base64
 import android.util.Log
-import androidx.core.app.ActivityCompat
 import com.cstef.meshlink.util.BleUuid
 import com.cstef.meshlink.util.struct.Chunk
 import com.cstef.meshlink.util.struct.KeyData
@@ -25,7 +21,8 @@ class ServerBleManager(
   private val context: Context,
   private val dataExchangeManager: BleManager.BleDataExchangeManager,
   private val callbackHandler: Handler,
-  private val encryptionManager: EncryptionManager
+  private val encryptionManager: EncryptionManager,
+  private val parentManager: BleManager
 ) {
 
   private val moshi = MoshiPack()
@@ -81,10 +78,19 @@ class ServerBleManager(
   private val advertiseData =
     AdvertiseData.Builder().addServiceUuid(ParcelUuid.fromString(BleUuid.SERVICE_UUID)).build()
 
-  private val advertiseCallback = object : AdvertiseCallback() {}
+  private val advertiseCallback = object : AdvertiseCallback() {
+    override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
+      super.onStartSuccess(settingsInEffect)
+      Log.d("ServerBleManager", "Advertising start success")
+    }
+
+    override fun onStartFailure(errorCode: Int) {
+      super.onStartFailure(errorCode)
+      Log.d("ServerBleManager", "Advertising start failure: $errorCode")
+    }
+  }
 
   private val serverCallback = object : BluetoothGattServerCallback() {
-
     @SuppressLint("MissingPermission")
     override fun onCharacteristicReadRequest(
       device: BluetoothDevice?,
@@ -177,38 +183,15 @@ class ServerBleManager(
         }
       }
     }
-  }
 
-  fun start(myUserId: String) {
-    if (ActivityCompat.checkSelfPermission(
-        context, Manifest.permission.BLUETOOTH_CONNECT
-      ) == PackageManager.PERMISSION_GRANTED || (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && ActivityCompat.checkSelfPermission(
-        context, Manifest.permission.BLUETOOTH_ADMIN
-      ) == PackageManager.PERMISSION_GRANTED)
-    ) {
-      userId = myUserId
-      openServer()
-      startAdvertising()
-    }
-  }
-
-  fun stop() {
-    if ((ActivityCompat.checkSelfPermission(
-        context, Manifest.permission.BLUETOOTH_CONNECT
-      ) == PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
-        context, Manifest.permission.BLUETOOTH_ADVERTISE
-      ) == PackageManager.PERMISSION_GRANTED) || (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && ActivityCompat.checkSelfPermission(
-        context, Manifest.permission.BLUETOOTH_ADMIN
-      ) == PackageManager.PERMISSION_GRANTED)
-    ) {
-      Log.d("ServerBleManager", "Closing server")
-      stopAdvertising()
-      closeServer()
+    override fun onMtuChanged(device: BluetoothDevice?, mtu: Int) {
+      super.onMtuChanged(device, mtu)
+      Log.d("ServerBleManager", "onMtuChanged: $mtu")
     }
   }
 
   @SuppressLint("MissingPermission")
-  private fun openServer() {
+  fun openServer() {
     if (adapter.isBleOn && gattServer == null) {
       gattServer = bluetoothManager.openGattServer(context, serverCallback)
       gattServer?.addService(bleService)
@@ -216,23 +199,31 @@ class ServerBleManager(
   }
 
   @SuppressLint("MissingPermission")
-  private fun closeServer() {
+  fun closeServer() {
     gattServer?.clearServices()
     gattServer?.close()
     gattServer = null
   }
 
   @SuppressLint("MissingPermission")
-  private fun startAdvertising() {
+  fun startAdvertising() {
     if (adapter.isBleOn) {
       advertiser?.startAdvertising(advertiseSettings, advertiseData, advertiseCallback)
+      parentManager.isAdvertising.value = true
+      Log.d("ServerBleManager", "startAdvertising: started")
     }
   }
 
   @SuppressLint("MissingPermission")
-  private fun stopAdvertising() {
+  fun stopAdvertising() {
     if (adapter.isBleOn) {
       advertiser?.stopAdvertising(advertiseCallback)
+      parentManager.isAdvertising.value = false
+      Log.d("ServerBleManager", "stopAdvertising: stopped")
     }
+  }
+
+  fun setUserId(id: String) {
+    userId = id
   }
 }

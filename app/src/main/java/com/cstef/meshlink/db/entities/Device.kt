@@ -7,6 +7,7 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "devices")
 data class Device(
   @PrimaryKey val userId: String,
+  @ColumnInfo(name = "address") val address: String,
   @ColumnInfo(name = "rssi") val rssi: Int = 0,
   @ColumnInfo(name = "last_seen") val lastSeen: Long,
   @ColumnInfo(name = "connected") val connected: Boolean,

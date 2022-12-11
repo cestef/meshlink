@@ -12,6 +12,7 @@ import android.os.Looper
 import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import com.cstef.meshlink.BleService
+import com.cstef.meshlink.db.entities.Device
 import com.cstef.meshlink.util.struct.Chunk
 import com.cstef.meshlink.util.struct.Message
 import java.security.PublicKey
@@ -30,7 +31,9 @@ class BleManager(
   serviceHandler: Handler
 ) {
 
-  var isStarted = mutableStateOf(false)
+  val isAdvertising = mutableStateOf(false)
+  val isStarted = mutableStateOf(false)
+  val isScanning = mutableStateOf(false)
   private val tag = BleManager::class.java.canonicalName
   private val adapter get() = (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
 
@@ -45,10 +48,11 @@ class BleManager(
       dataExchangeManager,
       callbackHandler,
       encryptionManager,
-      serviceHandler
+      serviceHandler,
+      this
     )
   private val serverManager =
-    ServerBleManager(context, dataExchangeManager, callbackHandler, encryptionManager)
+    ServerBleManager(context, dataExchangeManager, callbackHandler, encryptionManager, this)
 
   private val canBeClient: Boolean = adapter != null &&
     context.packageManager.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)
@@ -57,20 +61,11 @@ class BleManager(
   private val canBeServer: Boolean
     get() = adapter.bluetoothLeAdvertiser != null
 
-  fun start(userId: String) {
-    Log.d(tag, "BleManager started")
-    Log.d(tag, "canBeClient: $canBeClient")
-    Log.d(tag, "canBeServer: $canBeServer")
-    if (canBeClient) clientManager.start(userId)
-    if (canBeServer) serverManager.start(userId)
-    isStarted.value = true
-  }
-
   @SuppressLint("MissingPermission")
   fun stop() {
     Log.d(tag, "BleManager stopped")
     if (canBeClient) clientManager.stop()
-    if (canBeServer) serverManager.stop()
+    if (canBeServer) serverManager.stopAdvertising()
     isStarted.value = false
   }
 
@@ -110,6 +105,42 @@ class BleManager(
     clientManager.disconnect(userId)
   }
 
+  fun startScanning() {
+    if (canBeClient) clientManager.startScanning()
+  }
+
+  fun stopScanning() {
+    clientManager.stopScanning()
+  }
+
+  fun startAdvertising() {
+    if (canBeServer) serverManager.startAdvertising()
+  }
+
+  fun stopAdvertising() {
+    serverManager.stopAdvertising()
+  }
+
+  fun setUserId(id: String) {
+    clientManager.setUserId(id)
+    serverManager.setUserId(id)
+  }
+
+  fun openServer() {
+    if (canBeServer) serverManager.openServer()
+  }
+
+  fun closeServer() {
+    serverManager.closeServer()
+  }
+
+  fun startConnectOrUpdateKnownDevices() {
+    if (canBeClient) clientManager.startConnectOrUpdateKnownDevicesLoop()
+  }
+
+  fun stopConnectOrUpdateKnownDevices() {
+    clientManager.stopConnectOrUpdateKnownDevicesLoop()
+  }
 //  fun sendIsWriting(userId: String, writing: Boolean) {
 //    val deviceAddress = clientManager.connectedServersAddresses[userId]
 //    if (deviceAddress != null && clientManager.connectedGattServers.containsKey(deviceAddress)) {
@@ -136,13 +167,13 @@ class BleManager(
     /**
      * @param userId ID of the remote BLE device
      */
-    fun onUserConnected(userId: String) {}
+    fun onUserConnected(userId: String, address: String) {}
 
     /**
      * @param userId ID of the remote BLE device
      */
     fun onUserDisconnected(userId: String) {}
-    fun onUserPublicKeyReceived(userId: String, publicKey: PublicKey) {}
+    fun onUserPublicKeyReceived(userId: String, address: String, publicKey: PublicKey) {}
     fun getUsername(): String = ""
     fun getPublicKeyForUser(recipientId: String): PublicKey?
     fun onUserRssiReceived(userId: String, rssi: Int) {}
@@ -150,5 +181,7 @@ class BleManager(
     fun onUserWriting(userId: String, isWriting: Boolean) {}
     fun getUserIdForAddress(address: String): String? = ""
     fun onMessageSendFailed(userId: String?, reason: String?) {}
+    fun getKnownDevices(): List<Device> = emptyList()
+    fun getAddressForUserId(userId: String): String = ""
   }
 }

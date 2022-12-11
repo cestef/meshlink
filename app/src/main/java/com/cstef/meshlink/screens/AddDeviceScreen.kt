@@ -1,9 +1,6 @@
 package com.cstef.meshlink.screens
 
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.*
@@ -28,40 +25,47 @@ fun AddDeviceScreen(
   val (error, setError) = remember {
     mutableStateOf("")
   }
-  Row(modifier = Modifier.fillMaxSize()) {
-    OutlinedTextField(
-      value = userId,
-      onValueChange = {
-        setUserId(it)
-        setError("")
-      },
-      label = { Text("User ID") },
-      modifier = Modifier
-        .padding(16.dp)
-        .align(Alignment.CenterVertically)
-        .weight(1f)
-        .fillMaxWidth(),
-      isError = error.isNotEmpty(),
-      singleLine = true,
-
+  Column(modifier = Modifier.fillMaxSize()) {
+    TopAppBar(
+      title = { Text(text = "Add device") },
     )
-    FloatingActionButton(
-      onClick = {
-        // User Id format: 2 words and a 3 digits number separated by either a dot or a dash
-        if (bleBinder != null && userId.isNotEmpty() && userId != myUserId && Regex(
-            "^[a-zA-Z]+[\\.-]?[a-zA-Z]+[\\.-]?[0-9]{3}\$"
-          ).matches(userId)
-        ) {
-          bleBinder.addDevice(userId)
-          onBack()
-        } else {
-          setError("Please enter a valid user ID")
-        }
-      }, modifier = Modifier
-        .align(Alignment.CenterVertically)
-        .padding(end = 16.dp, top = 8.dp)
-    ) {
-      Icon(Icons.Rounded.Add, contentDescription = "Add device")
+    Row(modifier = Modifier.fillMaxSize()) {
+      OutlinedTextField(
+        value = userId,
+        onValueChange = {
+          setUserId(it)
+          setError("")
+        },
+        label = { Text("User ID") },
+        modifier = Modifier
+          .padding(16.dp)
+          .align(Alignment.CenterVertically)
+          .weight(1f)
+          .fillMaxWidth(),
+        isError = error.isNotEmpty(),
+        singleLine = true,
+
+        )
+      FloatingActionButton(
+        onClick = {
+          // User Id format: 2 words and a 3 digits number separated by either a dot or a dash
+          if (bleBinder != null && userId.isNotEmpty() && userId != myUserId && Regex(
+              "^[a-zA-Z]+[\\.-]?[a-zA-Z]+[\\.-]?[0-9]{3}\$"
+            ).matches(userId)
+          ) {
+            // bleBinder.addDevice(userId)
+            onBack()
+          } else {
+            setError("Please enter a valid user ID")
+          }
+        }, modifier = Modifier
+          .align(Alignment.CenterVertically)
+          .padding(end = 16.dp, top = 8.dp)
+      ) {
+        Icon(Icons.Rounded.Add, contentDescription = "Add device")
+      }
     }
+    // QR code scanner
+
   }
 }

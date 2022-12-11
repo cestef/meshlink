@@ -5,7 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -28,6 +27,7 @@ fun UserInfoScreen(
   bleBinder: BleService.BleServiceBinder,
   userId: String?,
   isMe: Boolean,
+  openSettings: () -> Unit
 ) {
   val context = LocalContext.current
   val colors = if (isSystemInDarkTheme()) DarkColors else LightColors
@@ -57,7 +57,7 @@ fun UserInfoScreen(
           overflow = TextOverflow.Ellipsis,
         )
         Text(
-          text = userId,
+          text = "",
           style = MaterialTheme.typography.bodyLarge,
           modifier = Modifier
             .padding(bottom = 16.dp)
@@ -68,7 +68,7 @@ fun UserInfoScreen(
         )
       } else {
         Text(
-          text = userId,
+          text = "$userId ${if (isMe) "(me)" else if (device?.blocked == true) "(blocked)" else ""}",
           style = MaterialTheme.typography.titleLarge,
           modifier = Modifier
             .padding(top = 16.dp, bottom = 16.dp)
@@ -79,7 +79,7 @@ fun UserInfoScreen(
         )
       }
 
-      bleBinder.getPublicKeySignature(userId)?.let {
+      bleBinder.getPublicKeySignature(userId).let {
         Text(
           text = "Public key",
           style = MaterialTheme.typography.titleMedium,
@@ -106,14 +106,7 @@ fun UserInfoScreen(
           color = colors.onBackground,
           style = MaterialTheme.typography.bodySmall
         )
-      } ?: Text(
-        text = "No public key available",
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier
-          .padding(top = 16.dp, bottom = 16.dp)
-          .align(Alignment.CenterHorizontally),
-        color = colors.onBackground
-      )
+      }
       val (newName, setNewName) = remember { mutableStateOf(device?.name ?: "") }
       OutlinedTextField(value = newName,
         onValueChange = {
@@ -186,106 +179,15 @@ fun UserInfoScreen(
           }
         }
       } else {
-        val (confirmDelete, setConfirmDelete) = remember { mutableStateOf(false) }
-        val (passwordDialogVisible, setPasswordDialogVisible) = remember { mutableStateOf(false) }
-
-        if (confirmDelete) {
-          AlertDialog(onDismissRequest = {
-            setConfirmDelete(false)
-          },
-            title = { Text("Delete data") },
-            text = { Text("Are you sure you want to delete all data?") },
-            confirmButton = {
-              Button(onClick = {
-                bleBinder.deleteAllData()
-                setConfirmDelete(false)
-              }) {
-                Text("Delete")
-              }
-            },
-            dismissButton = {
-              TextButton(onClick = {
-                setConfirmDelete(false)
-              }) {
-                Text("Cancel")
-              }
-            })
-        }
-        if (passwordDialogVisible) {
-          val (newPassword, setNewPassword) = remember { mutableStateOf("") }
-          AlertDialog(onDismissRequest = {
-            setPasswordDialogVisible(false)
-          },
-            title = { Text("Enter password") },
-            text = {
-              Column {
-                OutlinedTextField(value = newPassword,
-                  onValueChange = {
-                    setNewPassword(it)
-                  },
-                  label = { Text("New password") },
-                  modifier = Modifier
-                    .padding(top = 16.dp, bottom = 16.dp)
-                    .align(Alignment.CenterHorizontally),
-                  singleLine = true,
-                  trailingIcon = {
-                    IconButton(onClick = {
-                      setNewPassword("")
-                    }) {
-                      Icon(
-                        imageVector = Icons.Default.Clear, contentDescription = "Clear"
-                      )
-                    }
-                  })
-              }
-            },
-            confirmButton = {
-              Button(onClick = {
-                val success = bleBinder.changeDatabasePassword(newPassword)
-                if (success) {
-                  setPasswordDialogVisible(false)
-                } else {
-                  Toast
-                    .makeText(context, "Wrong password", Toast.LENGTH_SHORT)
-                    .show()
-                }
-              }) {
-                Text("Set")
-              }
-            },
-            dismissButton = {
-              TextButton(onClick = {
-                setPasswordDialogVisible(false)
-              }) {
-                Text("Cancel")
-              }
-            })
-        }
-        Row(
-          modifier = Modifier
-            .align(Alignment.CenterHorizontally)
+        // Settings button
+        Button(
+          onClick = {
+            openSettings()
+          }, modifier = Modifier
             .padding(top = 16.dp, bottom = 16.dp)
+            .align(Alignment.CenterHorizontally)
         ) {
-          Button(
-            onClick = {
-              setConfirmDelete(true)
-            }, modifier = Modifier
-
-          ) {
-            Text(
-              text = "Delete all data",
-            )
-          }
-          Button(
-            onClick = {
-              setPasswordDialogVisible(true)
-            }, modifier = Modifier.padding(start = 16.dp)
-
-          ) {
-            Text(
-              text = "Set password",
-            )
-          }
+          Text("Settings")
         }
       }
     }

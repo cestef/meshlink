@@ -25,11 +25,9 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -47,14 +45,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.cstef.meshlink.managers.isBleOn
-import com.cstef.meshlink.screens.AddDeviceScreen
-import com.cstef.meshlink.screens.ChatScreen
-import com.cstef.meshlink.screens.ScanScreen
-import com.cstef.meshlink.screens.UserInfoScreen
+import com.cstef.meshlink.screens.*
 import com.cstef.meshlink.ui.theme.AppTheme
 import com.cstef.meshlink.ui.theme.DarkColors
 import com.cstef.meshlink.ui.theme.LightColors
-import com.cstef.meshlink.util.RequestCode
 import com.cstef.meshlink.util.generateFriendlyId
 
 class MainActivity : AppCompatActivity() {
@@ -124,6 +118,7 @@ class MainActivity : AppCompatActivity() {
           )
       ) {
         val started by bleBinder?.isBleStarted!!
+        val isScanning by bleBinder?.isScanning!!
         val navController = rememberNavController()
         val isDatabaseOpen by bleBinder!!.isDatabaseOpen.observeAsState(false)
         val isDatabaseOpening by bleBinder!!.isDatabaseOpening.observeAsState(false)
@@ -207,8 +202,17 @@ class MainActivity : AppCompatActivity() {
               editor.putBoolean("first_time", false)
               editor.apply()
             }
-            if (!started) {
-              bleBinder?.start(userId)
+            val scan = sharedPreferences.getBoolean("is_scanning", true)
+            val advertise = sharedPreferences.getBoolean("is_advertising", true)
+
+            openServer()
+            startConnectOrUpdateKnownDevices()
+
+            if (advertise) {
+              startAdvertising()
+            }
+            if (scan) {
+              startScanning()
             }
           }
           NavHost(navController = navController, startDestination = "scan") {
@@ -236,25 +240,6 @@ class MainActivity : AppCompatActivity() {
                       contentDescription = "Add device",
                     )
                   }
-                  ExtendedFloatingActionButton(
-                    onClick = {
-                      if (started) {
-                        stopBle()
-                      } else {
-                        startBle()
-                      }
-                    },
-                    icon = {
-                      Icon(
-                        imageVector = if (started) Icons.Rounded.Close else Icons.Filled.PlayArrow,
-                        contentDescription = "Start/Stop"
-                      )
-                    },
-                    text = { Text(text = if (started) "Stop" else "Start") },
-                    modifier = Modifier
-                      .padding(24.dp)
-                      .align(Alignment.BottomEnd),
-                  )
                 }
               }
             }
@@ -286,6 +271,27 @@ class MainActivity : AppCompatActivity() {
                   it,
                   backStackEntry.arguments?.getString("deviceId"),
                   backStackEntry.arguments?.getString("deviceId") == userId
+                ) {
+                  navController.navigate("settings")
+                }
+              }
+            }
+            composable("settings") {
+              bleBinder?.let { binder ->
+                SettingsScreen(
+                  binder,
+                  startScanning = {
+                    startScanning()
+                  },
+                  stopScanning = {
+                    stopScanning()
+                  },
+                  startAdvertising = {
+                    startAdvertising()
+                  },
+                  stopAdvertising = {
+                    stopAdvertising()
+                  },
                 )
               }
             }
@@ -295,110 +301,167 @@ class MainActivity : AppCompatActivity() {
     }
   }
 
+  private fun openServer() {
+    requestPermissions {
+      bleBinder?.openServer()
+    }
+  }
+
+  private fun startConnectOrUpdateKnownDevices() {
+    requestPermissions {
+      bleBinder?.startConnectOrUpdateKnownDevices()
+    }
+  }
+
   override fun onDestroy() {
     super.onDestroy()
     unbindService()
   }
 
-  override fun onRequestPermissionsResult(
-    requestCode: Int, permissions: Array<out String>, grantResults: IntArray
-  ) {
-    super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-    if (requestCode == RequestCode.ACCESS_COARSE_LOCATION) {
-      if (grantResults.isEmpty() || grantResults.first() != PackageManager.PERMISSION_GRANTED) {
-        Toast.makeText(this, "Location Permission required to scan", Toast.LENGTH_SHORT).show()
-        requestPermissions()
-      }
-    }
-  }
-
-  private var requestBluetooth =
+  private val requestEnableBluetooth =
     registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
       if (result.resultCode != RESULT_OK) {
         Toast.makeText(this, "Bluetooth is required to scan", Toast.LENGTH_SHORT).show()
         requestPermissions()
       }
     }
-  private val requestMultiplePermissions =
-    registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
-      permissions.entries.forEach {
-        Log.d("test006", "${it.key} = ${it.value}")
+  private val _requestLocation =
+    registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+      // Check if all permissions are granted
+      if (result.values.all { it }) {
+        // TODO
+      } else {
+        Toast.makeText(this, "Location Permission required to scan", Toast.LENGTH_SHORT).show()
+        requestPermissions()
       }
-      if (!permissions.filter { it.key != Manifest.permission.BLUETOOTH_ADMIN }
-          .all { it.value } && permissions[Manifest.permission.BLUETOOTH_ADMIN] == false) {
-        Toast.makeText(
-          this,
-          "Please allow every permission for MeshLink to work correctly",
-          Toast.LENGTH_SHORT
-        ).show()
+    }
+  private val requestLocation = {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+      _requestLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION))
+    } else {
+      _requestLocation.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION))
+    }
+  }
+
+  private val checkLocation = {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+      ContextCompat.checkSelfPermission(
+        this,
+        Manifest.permission.ACCESS_FINE_LOCATION
+      ) == PackageManager.PERMISSION_GRANTED
+    } else {
+      ContextCompat.checkSelfPermission(
+        this,
+        Manifest.permission.ACCESS_COARSE_LOCATION
+      ) == PackageManager.PERMISSION_GRANTED
+    }
+  }
+
+  private val _requestBluetooth =
+    registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+      // Check if all permissions are granted
+      if (result.values.all { it }) {
+        // TODO
+      } else {
+        Toast.makeText(this, "Bluetooth Permission required to scan", Toast.LENGTH_SHORT).show()
         requestPermissions()
       }
     }
 
-
-  private fun requestPermissions() {
+  private val requestBluetooth = {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-      if (ContextCompat.checkSelfPermission(
-          this, Manifest.permission.BLUETOOTH_ADMIN
-        ) != PackageManager.PERMISSION_GRANTED
-      ) {
-        requestMultiplePermissions.launch(
-          arrayOf(
-            Manifest.permission.BLUETOOTH_ADMIN
-          )
-        )
-        return
-      }
-    } else {
-      if (ContextCompat.checkSelfPermission(
-          this, Manifest.permission.BLUETOOTH_ADVERTISE
-        ) != PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
-          this, Manifest.permission.BLUETOOTH_CONNECT
-        ) != PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
-          this, Manifest.permission.BLUETOOTH_SCAN
-        ) != PackageManager.PERMISSION_GRANTED
-      ) {
-        requestMultiplePermissions.launch(
-          arrayOf(
-            Manifest.permission.BLUETOOTH_ADVERTISE,
-            Manifest.permission.BLUETOOTH_SCAN,
-            Manifest.permission.BLUETOOTH_CONNECT
-          )
-        )
-        return
-      }
-    }
-
-    val adapter = (getSystemService(BLUETOOTH_SERVICE) as BluetoothManager).adapter
-    if (!adapter.isBleOn) {
-      val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
-      requestBluetooth.launch(enableBtIntent)
-      return
-    }
-
-    if (ContextCompat.checkSelfPermission(
-        this, Manifest.permission.ACCESS_COARSE_LOCATION
-      ) != PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
-        this, Manifest.permission.ACCESS_FINE_LOCATION
-      ) != PackageManager.PERMISSION_GRANTED
-    ) {
-      requestMultiplePermissions.launch(
+      _requestBluetooth.launch(
         arrayOf(
-          Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION
+          Manifest.permission.BLUETOOTH_ADMIN
         )
       )
-      return
+    } else {
+      _requestBluetooth.launch(
+        arrayOf(
+          Manifest.permission.BLUETOOTH_ADVERTISE,
+          Manifest.permission.BLUETOOTH_SCAN,
+          Manifest.permission.BLUETOOTH_CONNECT
+        )
+      )
     }
   }
 
-  fun startBle() {
-    bleService?.start(userId)
-    Toast.makeText(this, "Service Started", Toast.LENGTH_SHORT).show()
+  private val checkBluetooth = {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+      ContextCompat.checkSelfPermission(
+        this,
+        Manifest.permission.BLUETOOTH_ADMIN
+      ) == PackageManager.PERMISSION_GRANTED
+    } else {
+      ContextCompat.checkSelfPermission(
+        this,
+        Manifest.permission.BLUETOOTH_ADVERTISE
+      ) == PackageManager.PERMISSION_GRANTED &&
+        ContextCompat.checkSelfPermission(
+          this,
+          Manifest.permission.BLUETOOTH_SCAN
+        ) == PackageManager.PERMISSION_GRANTED &&
+        ContextCompat.checkSelfPermission(
+          this,
+          Manifest.permission.BLUETOOTH_CONNECT
+        ) == PackageManager.PERMISSION_GRANTED
+    }
   }
 
-  fun stopBle() {
-    bleService?.stop()
-    Toast.makeText(this, "Service Stopped", Toast.LENGTH_SHORT).show()
+  private fun requestPermissions(onSuccess: () -> Unit = {}) {
+    if (!checkBluetooth()) {
+      Log.d("MainActivity", "Requesting bluetooth permissions")
+      requestBluetooth()
+    }
+    val adapter = (getSystemService(BLUETOOTH_SERVICE) as BluetoothManager).adapter
+    if (!adapter.isBleOn) {
+      Log.d("MainActivity", "Requesting Bluetooth")
+      requestEnableBluetooth.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+    }
+    if (!checkLocation()) {
+      Log.d("MainActivity", "Requesting location permission")
+      requestLocation()
+    }
+    if (checkBluetooth() && adapter.isBleOn && checkLocation()) {
+      Log.d("MainActivity", "All permissions granted")
+      onSuccess()
+    }
+  }
+
+  private fun startAdvertising() {
+    requestPermissions {
+      val sharedPreferences = getSharedPreferences("USER_SETTINGS", Context.MODE_PRIVATE)
+      val editor = sharedPreferences.edit()
+      editor.putBoolean("is_advertising", true)
+      editor.apply()
+      bleBinder?.startAdvertising()
+    }
+  }
+
+  private fun stopAdvertising() {
+    val sharedPreferences = getSharedPreferences("USER_SETTINGS", Context.MODE_PRIVATE)
+    val editor = sharedPreferences.edit()
+    editor.putBoolean("is_advertising", false)
+    editor.apply()
+    bleBinder?.stopAdvertising()
+  }
+
+  private fun startScanning() {
+    requestPermissions {
+      val sharedPreferences = getSharedPreferences("USER_SETTINGS", Context.MODE_PRIVATE)
+      val editor = sharedPreferences.edit()
+      editor.putBoolean("is_scanning", true)
+      editor.apply()
+      bleBinder?.startScanning()
+    }
+  }
+
+  private fun stopScanning() {
+    val sharedPreferences = getSharedPreferences("USER_SETTINGS", Context.MODE_PRIVATE)
+    val editor = sharedPreferences.edit()
+    editor.putBoolean("is_scanning", false)
+    editor.apply()
+    bleBinder?.stopScanning()
   }
 
   private fun createNotificationChannels() {
@@ -442,10 +505,11 @@ class MainActivity : AppCompatActivity() {
       Log.d("test006", "onServiceConnected")
       bleService = (service as BleService.BleServiceBinder).service
       bleBinder = service
-      requestPermissions()
+      bleBinder!!.setUserId(userId)
       // get isFirstTime from shared preferences
       val sharedPreferences = getSharedPreferences("USER_SETTINGS", Context.MODE_PRIVATE)
       val isFirstTime = sharedPreferences.getBoolean("first_time", true)
+
       setContent {
         App(isFirstTime)
       }

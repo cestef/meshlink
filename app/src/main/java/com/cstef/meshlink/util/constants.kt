@@ -9,10 +9,6 @@ object BleUuid {
   const val USER_WRITING_UUID = "00000007-1000-4000-9000-a16b52011896"
 }
 
-object RequestCode {
-  const val ACCESS_COARSE_LOCATION = 101
-}
-
 const val AVATAR_SIZE = 36
 
 // awesome-horse-123
