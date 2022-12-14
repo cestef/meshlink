@@ -44,7 +44,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.cstef.meshlink.managers.isBleOn
 import com.cstef.meshlink.screens.*
 import com.cstef.meshlink.ui.theme.AppTheme
 import com.cstef.meshlink.ui.theme.DarkColors
@@ -204,13 +203,10 @@ class MainActivity : AppCompatActivity() {
               editor.putBoolean("first_time", false)
               editor.apply()
             }
-            val advertise = sharedPreferences.getBoolean("is_advertising", true)
-
-            openServer()
-            startClient()
-
-            if (advertise) {
-              startAdvertising()
+            if (!checkBluetoothEnabled()) {
+              Toast.makeText(this@MainActivity, "Bluetooth is disabled", Toast.LENGTH_LONG).show()
+            } else {
+              start()
             }
           }
           NavHost(navController = navController, startDestination = "home") {
@@ -300,46 +296,13 @@ class MainActivity : AppCompatActivity() {
     }
   }
 
-  private fun startClient() {
-    requestPermissions {
-      bleBinder?.startClient()
-    }
+  private fun checkBluetoothEnabled(): Boolean {
+    val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+    return bluetoothManager.adapter.isEnabled
   }
 
-  private fun openServer() {
-    requestPermissions {
-      bleBinder?.openServer()
-    }
-  }
-
-  override fun onDestroy() {
-    super.onDestroy()
-    unbindService()
-  }
-
-  private val _requestEnableBluetooth =
-    registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-      if (result.resultCode != RESULT_OK) {
-        Toast.makeText(this, "Bluetooth is required to scan", Toast.LENGTH_SHORT).show()
-        requestPermissions()
-      }
-    }
-
-  private fun requestEnableBluetooth(onSuccess: () -> Unit) {
-    val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
-    _requestEnableBluetooth.launch(enableBtIntent)
-    requestPermissions(onSuccess)
-  }
-
-  private fun requestAllPermissions(onSuccess: () -> Unit) {
-    registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
-      if (result.all { it.value }) {
-        onSuccess()
-      } else {
-        Toast.makeText(this, "Permissions are required to scan", Toast.LENGTH_SHORT).show()
-        requestPermissions(onSuccess)
-      }
-    }.launch(
+  private fun start() {
+    _requestPermissionsForBoth.launch(
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         arrayOf(
           Manifest.permission.ACCESS_FINE_LOCATION,
@@ -359,6 +322,38 @@ class MainActivity : AppCompatActivity() {
       }
     )
   }
+
+  override fun onDestroy() {
+    super.onDestroy()
+    unbindService()
+  }
+
+  private val _requestEnableBluetooth =
+    registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+      if (result.resultCode != RESULT_OK) {
+        Toast.makeText(this, "Bluetooth is required to scan", Toast.LENGTH_SHORT).show()
+      }
+    }
+
+  private fun requestEnableBluetooth() {
+    val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+    _requestEnableBluetooth.launch(enableBtIntent)
+  }
+
+  private val _requestPermissionsForBoth =
+    registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+      if (permissions.all { it.value }) {
+        bleBinder?.startClient()
+        bleBinder?.openServer()
+        val sharedPreferences = getSharedPreferences("USER_SETTINGS", Context.MODE_PRIVATE)
+        val advertise = sharedPreferences.getBoolean("is_advertising", true)
+        if (advertise) {
+          startAdvertising()
+        }
+      } else {
+        Toast.makeText(this, "Permissions are required to scan", Toast.LENGTH_SHORT).show()
+      }
+    }
 
   private val checkLocation = {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -396,32 +391,12 @@ class MainActivity : AppCompatActivity() {
     }
   }
 
-  private fun requestPermissions(onSuccess: () -> Unit = {}) {
-    val adapter = (getSystemService(BLUETOOTH_SERVICE) as BluetoothManager).adapter
-    if (!adapter.isBleOn) {
-      Log.d("MainActivity", "Requesting Bluetooth")
-      requestEnableBluetooth(onSuccess)
-      return
-    }
-    if (!checkBluetooth() || !checkLocation()) {
-      Log.d("MainActivity", "Requesting bluetooth permissions")
-      requestAllPermissions(onSuccess)
-      return
-    }
-    if (checkBluetooth() && adapter.isBleOn && checkLocation()) {
-      Log.d("MainActivity", "All permissions granted")
-      onSuccess()
-    }
-  }
-
   private fun startAdvertising() {
-    requestPermissions {
-      val sharedPreferences = getSharedPreferences("USER_SETTINGS", Context.MODE_PRIVATE)
-      val editor = sharedPreferences.edit()
-      editor.putBoolean("is_advertising", true)
-      editor.apply()
-      bleBinder?.startAdvertising()
-    }
+    val sharedPreferences = getSharedPreferences("USER_SETTINGS", Context.MODE_PRIVATE)
+    val editor = sharedPreferences.edit()
+    editor.putBoolean("is_advertising", true)
+    editor.apply()
+    bleBinder?.startAdvertising()
   }
 
   private fun stopAdvertising() {
