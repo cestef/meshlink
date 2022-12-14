@@ -27,11 +27,6 @@ import java.util.*
 
 
 class BleService : Service() {
-  companion object {
-    val ACTION_DEVICE = Intent("com.cstef.meshlink.ACTION_USER")
-    val ACTION_MESSAGES = Intent("com.cstef.meshlink.ACTION_MESSAGES")
-  }
-
   private val moshi = MoshiPack()
   private var userId: String = ""
   private val mBinder: IBinder = BleServiceBinder()
@@ -43,13 +38,12 @@ class BleService : Service() {
   }
 
   inner class BleServiceBinder : Binder() {
+    val encryptionManager: EncryptionManager
+      get() = this@BleService.encryptionManager
     val isAdvertising
       get() = bleManager.isAdvertising
     val service: BleService
       get() = this@BleService
-
-    val isBleStarted
-      get() = bleManager.isStarted
     val isScanning
       get() = bleManager.isScanning
     val isDatabaseOpen: LiveData<Boolean>
@@ -82,9 +76,8 @@ class BleService : Service() {
       )
     }
 
-    fun addDevice(userId: String, address: String, publicKey: PublicKey) {
-      bleDataExchangeManager.onUserConnected(userId, address)
-      bleDataExchangeManager.onUserPublicKeyReceived(userId, address, publicKey)
+    fun addDevice(userId: String) {
+      bleDataExchangeManager.onUserAdded(userId)
     }
 
 //    fun sendIsWriting(userId: String, isWriting: Boolean) {
@@ -95,7 +88,7 @@ class BleService : Service() {
       val device = allDevices.value?.find { it.userId == otherUserId }
       return if (otherUserId == userId) {
         encryptionManager.getPublicKeySignature(encryptionManager.publicKey)
-      } else if (device != null) {
+      } else if (device?.publicKey != null) {
         encryptionManager.getPublicKeySignature(
           encryptionManager.getPublicKey(
             Base64.decode(
@@ -144,7 +137,6 @@ class BleService : Service() {
       messageRepository?.deleteAll()
       // Disconnect from all devices
       bleManager.disconnectAll()
-
     }
 
     fun deleteDataForUser(device: Device) {
@@ -187,12 +179,18 @@ class BleService : Service() {
       bleManager.stopAdvertising()
     }
 
-    fun startConnectOrUpdateKnownDevices() {
-      bleManager.startConnectOrUpdateKnownDevices()
+    fun startClient() {
+      bleManager.startClient()
     }
 
-    fun stopConnectOrUpdateKnownDevices() {
-      bleManager.stopConnectOrUpdateKnownDevices()
+    fun setDeviceAdded(userId: String) {
+      val device = allDevices.value?.find { it.userId == userId }
+      if (device != null) {
+        deviceRepository?.update(device.copy(added = true))
+      } else {
+        Log.e("BleService", "Device not found")
+        Toast.makeText(this@BleService, "Device not found", Toast.LENGTH_SHORT).show()
+      }
     }
   }
 
@@ -209,60 +207,55 @@ class BleService : Service() {
       return allDevices?.value?.find { it.userId == userId }?.address ?: ""
     }
 
-    override fun onUserConnected(userId: String, address: String) {
+    override fun onUserAdded(userId: String) {
+      val existingDevice = allDevices?.value?.find { it.userId == userId }
+      if (existingDevice == null) {
+        val device = Device(userId = userId, added = true)
+        deviceRepository?.insert(device)
+      } else {
+        deviceRepository?.update(existingDevice.copy(added = true))
+      }
+    }
+
+    override fun onUserConnected(userId: String, serverAddress: String?, publicKey: PublicKey?) {
       Log.d("BleService", "onUserConnected: $userId")
       val devices = allDevices?.value ?: emptyList()
       if (!devices.any { it.userId == userId }) {
-        deviceRepository?.insert(Device(userId, address, 0, System.currentTimeMillis(), true))
-        val intent = Intent(ACTION_DEVICE)
-        sendBroadcast(intent)
+        deviceRepository?.insert(
+          Device(
+            userId = userId,
+            address = serverAddress,
+            rssi = 0,
+            lastSeen = System.currentTimeMillis(),
+            connected = true,
+            name = null,
+            blocked = false,
+            publicKey = publicKey?.encoded?.let { Base64.encodeToString(it, Base64.DEFAULT) },
+            added = false
+          )
+        )
       } else {
-        devices.find { it.userId == userId }?.let {
+        devices.find { it.userId == userId }?.let { device ->
           deviceRepository?.update(
-            it.copy(
+            device.copy(
+              address = serverAddress,
+              rssi = 0,
               lastSeen = System.currentTimeMillis(),
-              connected = true
+              connected = true,
+              publicKey = device.publicKey ?: publicKey?.encoded?.let {
+                Base64.encodeToString(
+                  it,
+                  Base64.DEFAULT
+                )
+              }
             )
           )
         }
       }
     }
 
-    override fun onUserPublicKeyReceived(userId: String, address: String, publicKey: PublicKey) {
-      Log.d("BleService", "onUserPublicKeyReceived: $userId")
-      // if the public key is already known, ask the user if they want to update it
-      val devices = allDevices?.value ?: emptyList()
-      val device = devices.find { it.userId == userId }
-      if (device != null) {
-        deviceRepository?.update(
-          device.copy(
-            publicKey = Base64.encodeToString(
-              publicKey.encoded,
-              Base64.DEFAULT
-            )
-          )
-        )
-      } else {
-        deviceRepository?.insert(
-          Device(
-            userId,
-            address,
-            publicKey = Base64.encodeToString(
-              publicKey.encoded,
-              Base64.DEFAULT
-            ),
-            lastSeen = System.currentTimeMillis(),
-            connected = true
-          )
-        )
-      }
-    }
-
     override fun onMessageSent(userId: String) {
       Log.d("BleService", "onMessageSent: $userId")
-      // Refresh chat fragment
-      val intent = Intent(ACTION_MESSAGES)
-      sendBroadcast(intent)
     }
 
     override fun onChunkReceived(chunk: Chunk, address: String) {
@@ -353,9 +346,6 @@ class BleService : Service() {
           notificationManager.notify(
             message.senderId.hashCode(), notification
           )
-
-          val intent = Intent(ACTION_MESSAGES)
-          sendBroadcast(intent)
         } else if (listOf(Message.Type.TEXT).contains(message.type) && message.ttl > 0) {
           Log.d("BleService", "onDataReceived: not for me")
           Toast.makeText(application, "Propagating a message", Toast.LENGTH_SHORT).show()
@@ -378,8 +368,6 @@ class BleService : Service() {
           deviceRepository?.update(devices[it].copy(connected = false))
         }
       }
-      val intent = Intent(ACTION_DEVICE)
-      sendBroadcast(intent)
     }
 
     override fun getPublicKeyForUser(recipientId: String): PublicKey? {
@@ -399,8 +387,6 @@ class BleService : Service() {
         val device = devices[0]
         if (device.rssi != rssi) {
           deviceRepository?.update(device.copy(rssi = rssi))
-          val intent = Intent(ACTION_DEVICE)
-          sendBroadcast(intent)
         }
       }
     }

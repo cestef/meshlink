@@ -75,14 +75,10 @@ class BleManager(
       Log.d(tag, clientManager.connectedGattServers[deviceAddress]?.device?.address!!)
       Log.d(tag, "Sending data to ${message.recipientId}")
       clientManager.sendData(message)
-      val intent = Intent(BleService.ACTION_MESSAGES)
-      context.sendBroadcast(intent)
     } else {
       Log.d(tag, "No connection to ${message.recipientId}, broadcasting data")
       if (message.type == Message.Type.TEXT) {
         clientManager.broadcastData(message)
-        val intent = Intent(BleService.ACTION_MESSAGES)
-        context.sendBroadcast(intent)
       } else {
         Log.e(tag, "Cannot broadcast other than text messages")
       }
@@ -134,12 +130,8 @@ class BleManager(
     serverManager.closeServer()
   }
 
-  fun startConnectOrUpdateKnownDevices() {
-    if (canBeClient) clientManager.startConnectOrUpdateKnownDevicesLoop()
-  }
-
-  fun stopConnectOrUpdateKnownDevices() {
-    clientManager.stopConnectOrUpdateKnownDevicesLoop()
+  fun startClient() {
+    if (canBeClient) clientManager.start()
   }
 //  fun sendIsWriting(userId: String, writing: Boolean) {
 //    val deviceAddress = clientManager.connectedServersAddresses[userId]
@@ -167,13 +159,13 @@ class BleManager(
     /**
      * @param userId ID of the remote BLE device
      */
-    fun onUserConnected(userId: String, address: String) {}
+    fun onUserConnected(userId: String, serverAddress: String?, publicKey: PublicKey?) {}
 
     /**
      * @param userId ID of the remote BLE device
      */
     fun onUserDisconnected(userId: String) {}
-    fun onUserPublicKeyReceived(userId: String, address: String, publicKey: PublicKey) {}
+    fun onUserPublicKeyReceived(userId: String, serverAddress: String, publicKey: PublicKey) {}
     fun getUsername(): String = ""
     fun getPublicKeyForUser(recipientId: String): PublicKey?
     fun onUserRssiReceived(userId: String, rssi: Int) {}
@@ -183,5 +175,6 @@ class BleManager(
     fun onMessageSendFailed(userId: String?, reason: String?) {}
     fun getKnownDevices(): List<Device> = emptyList()
     fun getAddressForUserId(userId: String): String = ""
+    fun onUserAdded(userId: String)
   }
 }

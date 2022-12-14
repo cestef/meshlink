@@ -15,11 +15,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cstef.meshlink.BleService
+import com.cstef.meshlink.ui.components.DeviceID
 import com.cstef.meshlink.ui.theme.DarkColors
 import com.cstef.meshlink.ui.theme.LightColors
+import com.daveanthonythomas.moshipack.MoshiPack
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,12 +28,17 @@ fun UserInfoScreen(
   bleBinder: BleService.BleServiceBinder,
   userId: String?,
   isMe: Boolean,
-  openSettings: () -> Unit
+  onBack: () -> Unit,
+  openSettings: () -> Unit,
 ) {
   val context = LocalContext.current
   val colors = if (isSystemInDarkTheme()) DarkColors else LightColors
   val devices by bleBinder.allDevices.observeAsState(listOf())
   val device = devices.find { it.userId == userId }
+  val (isShowingQR, setIsShowingQR) = remember { mutableStateOf(false) }
+  val moshi = remember {
+    MoshiPack()
+  }
   // Display user info: Avatar, userID, public key, block/unblock button (if not me), delete data button (if me), rename text field (if not me)
   Column(modifier = Modifier.fillMaxSize()) {
     if (userId != null) {
@@ -43,42 +49,22 @@ fun UserInfoScreen(
           .size(64.dp)
           .align(Alignment.CenterHorizontally)
       )
+      DeviceID(
+        userId = userId, isMe = isMe, blocked = device?.blocked ?: false, modifier = Modifier
+          .padding(16.dp)
+          .fillMaxWidth()
+          .align(Alignment.CenterHorizontally)
+      )
       if (device?.name != null) {
         Text(
-          text = "${device.name} ${if (device.blocked) "(blocked)" else ""}",
-          style = MaterialTheme.typography.titleLarge,
-          modifier = Modifier
-            .padding(top = 16.dp, bottom = 16.dp, start = 24.dp, end = 24.dp)
-            .align(
-              Alignment.CenterHorizontally
-            ),
-          color = colors.onBackground,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-          text = "",
+          text = "$userId",
           style = MaterialTheme.typography.bodyLarge,
           modifier = Modifier
             .padding(bottom = 16.dp)
-            .align(
-              Alignment.CenterHorizontally
-            ),
-          color = colors.onBackground
-        )
-      } else {
-        Text(
-          text = "$userId ${if (isMe) "(me)" else if (device?.blocked == true) "(blocked)" else ""}",
-          style = MaterialTheme.typography.titleLarge,
-          modifier = Modifier
-            .padding(top = 16.dp, bottom = 16.dp)
-            .align(
-              Alignment.CenterHorizontally
-            ),
+            .weight(1f),
           color = colors.onBackground
         )
       }
-
       bleBinder.getPublicKeySignature(userId).let {
         Text(
           text = "Public key",
@@ -107,30 +93,28 @@ fun UserInfoScreen(
           style = MaterialTheme.typography.bodySmall
         )
       }
-      val (newName, setNewName) = remember { mutableStateOf(device?.name ?: "") }
-      OutlinedTextField(value = newName,
-        onValueChange = {
-          setNewName(it)
-        },
-        label = { Text("Nickname") },
-        enabled = !isMe,
-        modifier = Modifier
-          .padding(top = 16.dp, bottom = 16.dp)
-          .align(Alignment.CenterHorizontally),
-        singleLine = true,
-        trailingIcon = {
-          if (!isMe) {
-            IconButton(onClick = {
-              bleBinder.updateDeviceName(userId, newName)
-            }) {
-              Icon(
-                imageVector = Icons.Default.Done, contentDescription = "Done"
-              )
-            }
-          }
-        })
-
       if (!isMe) {
+        val (newName, setNewName) = remember { mutableStateOf(device?.name ?: "") }
+        OutlinedTextField(value = newName,
+          onValueChange = {
+            setNewName(it)
+          },
+          label = { Text("Nickname") },
+          modifier = Modifier
+            .padding(top = 16.dp, bottom = 16.dp)
+            .align(Alignment.CenterHorizontally),
+          singleLine = true,
+          trailingIcon = {
+            if (!isMe) {
+              IconButton(onClick = {
+                bleBinder.updateDeviceName(userId, newName)
+              }) {
+                Icon(
+                  imageVector = Icons.Default.Done, contentDescription = "Done"
+                )
+              }
+            }
+          })
         val (chooseDeleteMode, setChooseDeleteMode) = remember { mutableStateOf(false) }
         if (chooseDeleteMode) {
           AlertDialog(onDismissRequest = { setChooseDeleteMode(false) },
@@ -142,6 +126,7 @@ fun UserInfoScreen(
                   bleBinder.deleteDataForUser(device)
                 }
                 setChooseDeleteMode(false)
+                onBack()
               }) {
                 Text("Delete")
               }

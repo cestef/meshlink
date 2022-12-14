@@ -28,34 +28,6 @@ fun generateFriendlyId(): String {
   return "$adjective$separator$noun$separator$random"
 }
 
-@Composable
-fun SystemBroadcastReceiver(
-  systemAction: String, onSystemEvent: (intent: Intent?) -> Unit
-) {
-  // Grab the current context in this part of the UI tree
-  val context = LocalContext.current
-
-  // Safely use the latest onSystemEvent lambda passed to the function
-  val currentOnSystemEvent by rememberUpdatedState(onSystemEvent)
-
-  // If either context or systemAction changes, unregister and register again
-  DisposableEffect(context, systemAction) {
-    val intentFilter = IntentFilter(systemAction)
-    val broadcast = object : BroadcastReceiver() {
-      override fun onReceive(context: Context?, intent: Intent?) {
-        currentOnSystemEvent(intent)
-      }
-    }
-
-    context.registerReceiver(broadcast, intentFilter)
-
-    // When the effect leaves the Composition, remove the callback
-    onDispose {
-      context.unregisterReceiver(broadcast)
-    }
-  }
-}
-
 fun hashCode(name: String): Int {
   var hash = 0
   for (i in 0 until name.length) {

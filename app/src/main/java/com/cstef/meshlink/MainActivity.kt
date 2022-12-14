@@ -50,6 +50,7 @@ import com.cstef.meshlink.ui.theme.AppTheme
 import com.cstef.meshlink.ui.theme.DarkColors
 import com.cstef.meshlink.ui.theme.LightColors
 import com.cstef.meshlink.util.generateFriendlyId
+import com.daveanthonythomas.moshipack.MoshiPack
 
 class MainActivity : AppCompatActivity() {
 
@@ -108,7 +109,7 @@ class MainActivity : AppCompatActivity() {
   @ExperimentalAnimationApi
   @ExperimentalMaterial3Api
   @Composable
-  private fun App(firstTime: Boolean) {
+  private fun App(firstTime: Boolean, moshi: MoshiPack) {
     AppTheme {
       Box(
         modifier = Modifier
@@ -117,8 +118,6 @@ class MainActivity : AppCompatActivity() {
             if (isSystemInDarkTheme()) DarkColors.background else LightColors.background,
           )
       ) {
-        val started by bleBinder?.isBleStarted!!
-        val isScanning by bleBinder?.isScanning!!
         val navController = rememberNavController()
         val isDatabaseOpen by bleBinder!!.isDatabaseOpen.observeAsState(false)
         val isDatabaseOpening by bleBinder!!.isDatabaseOpening.observeAsState(false)
@@ -206,7 +205,7 @@ class MainActivity : AppCompatActivity() {
             val advertise = sharedPreferences.getBoolean("is_advertising", true)
 
             openServer()
-            startConnectOrUpdateKnownDevices()
+            startClient()
 
             if (advertise) {
               startAdvertising()
@@ -215,11 +214,11 @@ class MainActivity : AppCompatActivity() {
               startScanning()
             }
           }
-          NavHost(navController = navController, startDestination = "scan") {
-            composable("scan") {
+          NavHost(navController = navController, startDestination = "home") {
+            composable("home") {
               Box(modifier = Modifier.fillMaxSize()) {
                 if (bleBinder != null) {
-                  ScanScreen(
+                  HomeScreen(
                     bleBinder!!,
                     userId,
                     { navController.navigate("user/$userId") },
@@ -232,7 +231,7 @@ class MainActivity : AppCompatActivity() {
                       navController.navigate("add")
                     },
                     modifier = Modifier
-                      .align(Alignment.BottomStart)
+                      .align(Alignment.BottomEnd)
                       .padding(24.dp)
                   ) {
                     Icon(
@@ -257,8 +256,14 @@ class MainActivity : AppCompatActivity() {
               }
             }
             composable("add") {
-              AddDeviceScreen(bleBinder, userId) {
-                navController.popBackStack()
+              bleBinder?.let { binder ->
+                AddDeviceScreen(binder, moshi) { user ->
+                  if (user != null) {
+                    navController.navigate("user/${user}")
+                  } else {
+                    navController.popBackStack()
+                  }
+                }
               }
             }
             composable(
@@ -270,7 +275,8 @@ class MainActivity : AppCompatActivity() {
                 UserInfoScreen(
                   it,
                   backStackEntry.arguments?.getString("deviceId"),
-                  backStackEntry.arguments?.getString("deviceId") == userId
+                  backStackEntry.arguments?.getString("deviceId") == userId,
+                  onBack = { navController.popBackStack() }
                 ) {
                   navController.navigate("settings")
                 }
@@ -301,15 +307,15 @@ class MainActivity : AppCompatActivity() {
     }
   }
 
-  private fun openServer() {
+  private fun startClient() {
     requestPermissions {
-      bleBinder?.openServer()
+      bleBinder?.startClient()
     }
   }
 
-  private fun startConnectOrUpdateKnownDevices() {
+  private fun openServer() {
     requestPermissions {
-      bleBinder?.startConnectOrUpdateKnownDevices()
+      bleBinder?.openServer()
     }
   }
 
@@ -511,7 +517,7 @@ class MainActivity : AppCompatActivity() {
       val isFirstTime = sharedPreferences.getBoolean("first_time", true)
 
       setContent {
-        App(isFirstTime)
+        App(isFirstTime, MoshiPack())
       }
     }
 

@@ -42,7 +42,6 @@ class ClientBleManager(
   private val parentManager: BleManager
 ) {
 
-  private var connectLoopJob: Job? = null
   private var userId: String? = null
   private val moshi = MoshiPack()
 
@@ -87,13 +86,11 @@ class ClientBleManager(
       operationQueue.execute {
         if (connectedGattServers.containsKey(device.address)) {
           result.rssi.let { rssi ->
-            val userId = connectedServersAddresses.entries.find { it.value == device.address }?.key
-            if (userId != null) {
-              callbackHandler.post { dataExchangeManager.onUserRssiReceived(userId, rssi) }
-            } else {
-              Log.w(
-                "ClientBleManager", "onScanResult: userId not found for device ${device.address}"
-              )
+            connectedServersAddresses.entries.find { it.value == device.address }?.key.let { userId ->
+//              Log.d("ClientBleManager", "onScanResult: $userId $rssi")
+              if (userId != null) {
+                dataExchangeManager.onUserRssiReceived(userId, rssi)
+              }
             }
           }
           operationQueue.operationComplete()
@@ -235,13 +232,9 @@ class ClientBleManager(
               "ClientBleManager",
               "onCharacteristicRead: userId = $userId gatt == null: ${gatt == null}"
             )
-
             if (gatt != null) {
               connectedServersAddresses[userId] = gatt.device.address
               operationQueue.execute { gatt.readPublicKey() }
-              callbackHandler.post {
-                userId?.let { dataExchangeManager.onUserConnected(it, gatt.device.address) }
-              }
             } else {
               Log.e("ClientBleManager", "onCharacteristicRead: gatt == null")
             }
@@ -257,7 +250,7 @@ class ClientBleManager(
             )
             if (gatt != null) {
               callbackHandler.post {
-                dataExchangeManager.onUserPublicKeyReceived(
+                dataExchangeManager.onUserConnected(
                   msg.userId, gatt.device.address, publicKey
                 )
               }
@@ -266,7 +259,6 @@ class ClientBleManager(
             }
           }
         }
-
       } else {
         Log.e("ClientBleManager", "onCharacteristicRead: failed to read characteristic")
         gatt?.disconnect()
@@ -352,8 +344,8 @@ class ClientBleManager(
           context, Manifest.permission.BLUETOOTH_ADMIN
         ) == PackageManager.PERMISSION_GRANTED)
       ) {
-        scanner?.stopScan(scanCallback)
-        connectedGattServers.values.forEach { it.disconnect() }
+        _stopScanning()
+        disconnectAll()
       }
     }
     operationQueue.clear()
@@ -507,11 +499,15 @@ class ClientBleManager(
     }
   }
 
-  @SuppressLint("MissingPermission")
   fun startScanning() {
+    parentManager.isScanning.value = true
+    _startScanning()
+  }
+
+  @SuppressLint("MissingPermission")
+  private fun _startScanning() {
     if (adapter.isBleOn) {
       scanner?.startScan(scanFilters, scanSettings, scanCallback)
-      parentManager.isScanning.value = true
       Log.d("ClientBleManager", "startScanning: started")
     } else {
       Log.w("ClientBleManager", "startScanning: BLE is off")
@@ -519,50 +515,23 @@ class ClientBleManager(
   }
 
   @SuppressLint("MissingPermission")
-  fun stopScanning() {
+  private fun _stopScanning() {
     scanner?.stopScan(scanCallback)
+    Log.d("ClientBleManager", "stopScanning: stopped")
+  }
+
+  @SuppressLint("MissingPermission")
+  fun stopScanning() {
     parentManager.isScanning.value = false
     Log.d("ClientBleManager", "stopScanning: stopped")
   }
 
-  fun startConnectOrUpdateKnownDevicesLoop() {
-    if (connectLoopJob == null) {
-      connectLoopJob = CoroutineScope(Dispatchers.IO).launch {
-        while (true) {
-          delay(15000)
-          val knownDevices = dataExchangeManager.getKnownDevices()
-          knownDevices.forEach { device ->
-            if (connectedServersAddresses[device.userId] == null) {
-              Log.d(
-                "ClientBleManager",
-                "startConnectOrUpdateKnownDevicesLoop: Connecting to ${device.userId}"
-              )
-              connect(device.address)
-            }
-          }
-        }
-      }
-    }
-  }
-
-  fun stopConnectOrUpdateKnownDevicesLoop() {
-    connectLoopJob?.cancel()
-    connectLoopJob = null
-  }
-
-  @SuppressLint("MissingPermission")
-  fun connect(address: String) {
-    val device = adapter?.getRemoteDevice(address)
-    if (device != null) {
-      device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
-      Log.d("ClientBleManager", "connect: connecting to $address")
-    } else {
-      Log.w("ClientBleManager", "connect: device is null")
-    }
-  }
-
   fun setUserId(id: String) {
     userId = id
+  }
+
+  fun start() {
+    _startScanning()
   }
 
 //  @SuppressLint("MissingPermission")
