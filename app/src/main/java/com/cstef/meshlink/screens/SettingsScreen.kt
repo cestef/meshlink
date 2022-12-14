@@ -22,15 +22,12 @@ import com.cstef.meshlink.ui.theme.LightColors
 @Composable
 fun SettingsScreen(
   bleBinder: BleService.BleServiceBinder,
-  startScanning: () -> Unit,
-  stopScanning: () -> Unit,
   startAdvertising: () -> Unit,
   stopAdvertising: () -> Unit,
 ) {
   val colors = if (isSystemInDarkTheme()) DarkColors else LightColors
   val context = LocalContext.current
   val isAdvertising by bleBinder.isAdvertising
-  val isScanning by bleBinder.isScanning
   TopAppBar(
     title = { Text(text = "Settings") },
     modifier = Modifier
