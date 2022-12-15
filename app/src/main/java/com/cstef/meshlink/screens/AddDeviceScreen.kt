@@ -13,7 +13,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cstef.meshlink.BleService
@@ -40,19 +42,37 @@ fun AddDeviceScreen(
     TopAppBar(
       title = { Text(text = "Nearby devices") },
     )
-    LazyColumn(
-      contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-      modifier = Modifier
-        .fillMaxSize()
-        .weight(1f)
-    ) {
-      items(
-        devices.filter { it.connected && !it.added }
-      ) { device ->
-        AvailableDevice(device = device, onDeviceClick = {
-          bleBinder.setDeviceAdded(device.userId)
-          onBack(null)
-        })
+    if (devices.any { !it.added && it.connected }) {
+      LazyColumn(
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        modifier = Modifier
+          .fillMaxSize()
+          .weight(1f)
+      ) {
+        items(
+          devices.filter { it.connected && !it.added }
+        ) { device ->
+          AvailableDevice(device = device, onDeviceClick = {
+            bleBinder.setDeviceAdded(device.userId)
+            onBack(null)
+          })
+        }
+      }
+    } else {
+      Box(
+        modifier = Modifier
+          .fillMaxSize()
+          .weight(1f)
+      ) {
+        Text(
+          text = "No devices nearby :(",
+          style = MaterialTheme.typography.titleLarge,
+          textAlign = TextAlign.Center,
+          modifier = Modifier
+            .align(Alignment.Center)
+            .padding(bottom = 64.dp),
+          color = if (isSystemInDarkTheme()) DarkColors.onBackground else LightColors.onBackground
+        )
       }
     }
     val scanLauncher = rememberLauncherForActivityResult(
@@ -82,7 +102,6 @@ fun AddDeviceScreen(
     )
     Button(
       onClick = {
-        // only scan QR codes
         scanLauncher.launch(
           ScanOptions()
             .setDesiredBarcodeFormats(ScanOptions.ALL_CODE_TYPES)
