@@ -24,6 +24,7 @@ fun SettingsScreen(
   bleBinder: BleService.BleServiceBinder,
   startAdvertising: () -> Unit,
   stopAdvertising: () -> Unit,
+  goToAbout: () -> Unit,
 ) {
   val colors = if (isSystemInDarkTheme()) DarkColors else LightColors
   val context = LocalContext.current
@@ -123,6 +124,33 @@ fun SettingsScreen(
 
     // Change password
     val (passwordDialogVisible, setPasswordDialogVisible) = remember { mutableStateOf(false) }
+    val (confirmDeletePassword, setConfirmDeletePassword) = remember { mutableStateOf(false) }
+    if (confirmDeletePassword) {
+      AlertDialog(onDismissRequest = {
+        setConfirmDeletePassword(false)
+      },
+        title = { Text("Delete password") },
+        text = { Text("Are you sure you want to delete the password?") },
+        confirmButton = {
+          Button(onClick = {
+            val success = bleBinder.changeDatabasePassword("")
+            if (success) {
+              setConfirmDeletePassword(false)
+            } else {
+              Toast.makeText(context, "Failed to delete password", Toast.LENGTH_SHORT).show()
+            }
+          }) {
+            Text("Delete")
+          }
+        },
+        dismissButton = {
+          TextButton(onClick = {
+            setConfirmDeletePassword(false)
+          }) {
+            Text("Cancel")
+          }
+        })
+    }
     if (passwordDialogVisible) {
       val (newPassword, setNewPassword) = remember { mutableStateOf("") }
       AlertDialog(onDismissRequest = {
@@ -150,11 +178,17 @@ fun SettingsScreen(
         }
       }, confirmButton = {
         Button(onClick = {
-          val success = bleBinder.changeDatabasePassword(newPassword)
-          if (success) {
+          if (newPassword.isEmpty()) {
+            // Confirm if the user wants to remove the password
             setPasswordDialogVisible(false)
+            setConfirmDeletePassword(true)
           } else {
-            Toast.makeText(context, "Wrong password", Toast.LENGTH_SHORT).show()
+            val success = bleBinder.changeDatabasePassword(newPassword)
+            if (success) {
+              setPasswordDialogVisible(false)
+            } else {
+              Toast.makeText(context, "Wrong password", Toast.LENGTH_SHORT).show()
+            }
           }
         }) {
           Text("Set")
@@ -179,7 +213,7 @@ fun SettingsScreen(
     }
     // About button
     TextButton(
-      onClick = { /*TODO*/ }, modifier = Modifier
+      onClick = { goToAbout() }, modifier = Modifier
         .padding(start = 16.dp, end = 16.dp)
         .align(
           Alignment.CenterHorizontally

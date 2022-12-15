@@ -34,6 +34,7 @@ import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -124,13 +125,17 @@ class MainActivity : AppCompatActivity() {
         val isDatabaseOpen by bleBinder!!.isDatabaseOpen.observeAsState(false)
         val isDatabaseOpening by bleBinder!!.isDatabaseOpening.observeAsState(false)
         val databaseError by bleBinder!!.databaseError.observeAsState("")
-
+        val context = LocalContext.current
+        val sharedPreferences = context.getSharedPreferences("USER_SETTINGS", Context.MODE_PRIVATE)
+        val isDefaultPassword by remember {
+          mutableStateOf(sharedPreferences.getBoolean("is_default_password", false))
+        }
         LaunchedEffect(databaseError) {
           if (databaseError.isNotEmpty()) {
             Toast.makeText(this@MainActivity, databaseError, Toast.LENGTH_LONG).show()
           }
         }
-        if (!isDatabaseOpen && !isDatabaseOpening) {
+        if (!isDatabaseOpen && !isDatabaseOpening && !isDefaultPassword) {
           // Prompt the user to enter the master database password
           val (masterPassword, setMasterPassword) = remember { mutableStateOf("") }
           AlertDialog(
@@ -190,6 +195,10 @@ class MainActivity : AppCompatActivity() {
               )
             }
           )
+        } else if (isDefaultPassword && !isDatabaseOpening && !isDatabaseOpen) {
+          LaunchedEffect(Unit) {
+            bleBinder?.openDatabase(null)
+          }
         } else if (isDatabaseOpening) {
           AlertDialog(
             onDismissRequest = {},
@@ -197,7 +206,6 @@ class MainActivity : AppCompatActivity() {
             confirmButton = {})
         } else {
           LaunchedEffect(Unit) {
-            val sharedPreferences = getSharedPreferences("USER_SETTINGS", Context.MODE_PRIVATE)
             if (sharedPreferences.getBoolean("first_time", true)) {
               val editor = sharedPreferences.edit()
               editor.putBoolean("first_time", false)
@@ -287,8 +295,13 @@ class MainActivity : AppCompatActivity() {
                   stopAdvertising = {
                     stopAdvertising()
                   },
-                )
+                ) {
+                  navController.navigate("about")
+                }
               }
+            }
+            composable("about") {
+              AboutScreen()
             }
           }
         }

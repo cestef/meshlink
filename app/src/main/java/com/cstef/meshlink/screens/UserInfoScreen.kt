@@ -35,10 +35,6 @@ fun UserInfoScreen(
   val colors = if (isSystemInDarkTheme()) DarkColors else LightColors
   val devices by bleBinder.allDevices.observeAsState(listOf())
   val device = devices.find { it.userId == userId }
-  val (isShowingQR, setIsShowingQR) = remember { mutableStateOf(false) }
-  val moshi = remember {
-    MoshiPack()
-  }
   // Display user info: Avatar, userID, public key, block/unblock button (if not me), delete data button (if me), rename text field (if not me)
   Column(modifier = Modifier.fillMaxSize()) {
     if (userId != null) {

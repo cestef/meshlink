@@ -147,10 +147,16 @@ class BleService : Service() {
     }
 
     fun changeDatabasePassword(newPassword: String): Boolean {
+      val sharedPreferences = getSharedPreferences("USER_SETTINGS", MODE_PRIVATE)
+      if (newPassword.isEmpty()) {
+        sharedPreferences.edit().putBoolean("is_default_password", true).apply()
+      } else {
+        sharedPreferences.edit().putBoolean("is_default_password", false).apply()
+      }
       return AppDatabase.updatePassword(newPassword)
     }
 
-    fun openDatabase(masterPassword: String) {
+    fun openDatabase(masterPassword: String?) {
       this@BleService.openDatabase(masterPassword)
     }
 
@@ -436,7 +442,7 @@ class BleService : Service() {
   }
 
 
-  fun openDatabase(masterPassword: String) {
+  fun openDatabase(masterPassword: String?) {
     AppDatabase.destroyInstance()
     val db = AppDatabase.getInstance(application, masterPassword)
     val messageDao = db.messageDao()

@@ -29,7 +29,7 @@ abstract class AppDatabase : RoomDatabase() {
 
     fun getInstance(context: Context, passphrase: String?): AppDatabase {
       if (INSTANCE == null) {
-        val bytes = SQLiteDatabase.getBytes(passphrase?.toCharArray() ?: "MeshLink".toCharArray())
+        val bytes = SQLiteDatabase.getBytes(passphrase?.toCharArray() ?: "M3shL1nk".toCharArray())
         val factory = SupportFactory(bytes)
         INSTANCE = Room.databaseBuilder(
           context,
@@ -49,7 +49,7 @@ abstract class AppDatabase : RoomDatabase() {
       } else {
         val db = INSTANCE!!.openHelper.writableDatabase as SQLiteDatabase
         try {
-          db.changePassword(password)
+          db.changePassword(password.ifEmpty { "M3shL1nk" })
         } catch (e: Exception) {
           e.printStackTrace()
           return false
