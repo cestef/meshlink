@@ -30,7 +30,7 @@ fun AvailableDevice(
       .padding(8.dp)
       .fillMaxWidth(),
     onClick = { onDeviceClick(device.userId) },
-    shape = MaterialTheme.shapes.medium,
+    shape = MaterialTheme.shapes.large,
     colors = CardDefaults.cardColors(
       containerColor =
       if (isSystemInDarkTheme()) DarkColors.primaryContainer else LightColors.primaryContainer,

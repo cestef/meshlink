@@ -18,7 +18,7 @@ fun QRCode(modifier: Modifier = Modifier, content: String, size: Int = 500) {
   val bitmap = encoder.encodeBitmap(content, BarcodeFormat.QR_CODE, size, size)
   Image(
     bitmap = bitmap.asImageBitmap(), contentDescription = "QR Code", modifier = modifier.clip(
-      MaterialTheme.shapes.medium
+      MaterialTheme.shapes.large
     )
   )
 }

@@ -23,21 +23,14 @@ import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavType
@@ -130,80 +123,131 @@ class MainActivity : AppCompatActivity() {
         val isDefaultPassword by remember {
           mutableStateOf(sharedPreferences.getBoolean("is_default_password", false))
         }
+        NavHost(navController = navController, startDestination = "home") {
+          composable("home") {
+            if (isDatabaseOpen) {
+              Box(modifier = Modifier.fillMaxSize()) {
+                if (bleBinder != null) {
+                  HomeScreen(bleBinder!!,
+                    userId,
+                    { navController.navigate("user/$userId") },
+                    { navController.navigate("user/$it") },
+                    { navController.navigate("chat/$it") })
+                  // Manually add a device via its ID
+                  FloatingActionButton(
+                    onClick = {
+                      navController.navigate("add")
+                    }, modifier = Modifier
+                      .align(Alignment.BottomEnd)
+                      .padding(24.dp)
+                  ) {
+                    Icon(
+                      imageVector = Icons.Rounded.Add,
+                      contentDescription = "Add device",
+                    )
+                  }
+                }
+              }
+            } else if (isDatabaseOpening) {
+              Box(modifier = Modifier.fillMaxSize()) {
+                CircularProgressIndicator(
+                  modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(16.dp)
+                )
+              }
+            } else {
+              Box(modifier = Modifier.fillMaxSize()) {
+                Text(
+                  text = databaseError,
+                  modifier = Modifier.align(Alignment.Center),
+                  style = MaterialTheme.typography.titleLarge,
+                  color = if (isSystemInDarkTheme()) DarkColors.onBackground else LightColors.onBackground,
+                )
+              }
+            }
+          }
+          composable(
+            "chat/{deviceId}",
+            arguments = listOf(navArgument("deviceId") { type = NavType.StringType })
+          ) { backStackEntry ->
+            bleBinder?.let { binder ->
+              ChatScreen(
+                binder, backStackEntry.arguments?.getString("deviceId")
+              ) {
+                // Navigate to user info screen
+                navController.navigate("user/$it")
+              }
+            }
+          }
+          composable("add") {
+            bleBinder?.let { binder ->
+              AddDeviceScreen(binder, moshi) { user ->
+                if (user != null) {
+                  navController.navigate("user/${user}")
+                } else {
+                  navController.popBackStack()
+                }
+              }
+            }
+          }
+          composable(
+            "user/{deviceId}",
+            arguments = listOf(navArgument("deviceId") { type = NavType.StringType })
+          ) { backStackEntry ->
+            // User info screen
+            bleBinder?.let {
+              UserInfoScreen(it,
+                backStackEntry.arguments?.getString("deviceId"),
+                backStackEntry.arguments?.getString("deviceId") == userId,
+                onBack = { navController.popBackStack() }) {
+                navController.navigate("settings")
+              }
+            }
+          }
+          composable("settings") {
+            bleBinder?.let { binder ->
+              SettingsScreen(
+                binder,
+                startAdvertising = {
+                  startAdvertising()
+                },
+                stopAdvertising = {
+                  stopAdvertising()
+                },
+              ) {
+                navController.navigate("about")
+              }
+            }
+          }
+          composable("about") {
+            AboutScreen()
+          }
+          composable("password") {
+            bleBinder?.let { binder ->
+              PasswordScreen(
+                binder,
+                firstTime,
+                isDatabaseOpening
+              )
+            }
+          }
+        }
         LaunchedEffect(databaseError) {
           if (databaseError.isNotEmpty()) {
             Toast.makeText(this@MainActivity, databaseError, Toast.LENGTH_LONG).show()
           }
         }
-        if (!isDatabaseOpen && !isDatabaseOpening && !isDefaultPassword) {
-          // Prompt the user to enter the master database password
-          val (masterPassword, setMasterPassword) = remember { mutableStateOf("") }
-          AlertDialog(
-            onDismissRequest = {},
-            title = {
-              Text(text = if (firstTime) "Set Master Password" else "Enter Master Password")
-            },
-            text = {
-              var passwordVisible by rememberSaveable { mutableStateOf(false) }
-              Column {
-                if (firstTime) {
-                  Text(
-                    text = "This password will be used to encrypt your database.",
-                    modifier = Modifier.padding(bottom = 16.dp)
-                  )
-                }
-                OutlinedTextField(
-                  value = masterPassword,
-                  onValueChange = { setMasterPassword(it) },
-                  label = { Text(text = "Master password") },
-                  singleLine = true,
-                  visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                  modifier = Modifier.fillMaxWidth(),
-                  keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                  trailingIcon = {
-                    val image = if (passwordVisible)
-                      Icons.Filled.Visibility
-                    else Icons.Filled.VisibilityOff
-                    val description = if (passwordVisible) "Hide password" else "Show password"
-                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                      Icon(imageVector = image, description)
-                    }
-                  }
-                )
-                if (firstTime) {
-                  Text(
-                    text = "You can change it later in your user profile.",
-                    modifier = Modifier.padding(top = 16.dp)
-                  )
-                }
-              }
-            },
-            confirmButton = {
-              Button(
-                onClick = {
-                  if (masterPassword.isNotEmpty()) {
-                    bleBinder?.openDatabase(masterPassword)
-                  }
-                },
-                content = { Text(text = "Confirm") }
-              )
-            },
-            dismissButton = {
-              TextButton(
-                onClick = { bleBinder?.openDatabase("") },
-                content = { Text(text = "Cancel") }
-              )
+        if (!isDatabaseOpen && !isDatabaseOpening) {
+          if (!isDefaultPassword) {
+            navController.navigate("password") {
+              popUpTo("password") { inclusive = true }
             }
-          )
-        } else if (isDefaultPassword && !isDatabaseOpening && !isDatabaseOpen) {
-          LaunchedEffect(Unit) {
-            bleBinder?.openDatabase(null)
+          } else {
+            LaunchedEffect(Unit) {
+              bleBinder?.openDatabase(null)
+            }
           }
-        } else if (isDatabaseOpening) {
-          AlertDialog(
-            onDismissRequest = {},
-            title = { Text(text = "Opening database...") },
-            confirmButton = {})
         } else {
           LaunchedEffect(Unit) {
             if (sharedPreferences.getBoolean("first_time", true)) {
@@ -216,92 +260,8 @@ class MainActivity : AppCompatActivity() {
             } else {
               start()
             }
-          }
-          NavHost(navController = navController, startDestination = "home") {
-            composable("home") {
-              Box(modifier = Modifier.fillMaxSize()) {
-                if (bleBinder != null) {
-                  HomeScreen(
-                    bleBinder!!,
-                    userId,
-                    { navController.navigate("user/$userId") },
-                    { navController.navigate("user/$it") },
-                    { navController.navigate("chat/$it") }
-                  )
-                  // Manually add a device via its ID
-                  FloatingActionButton(
-                    onClick = {
-                      navController.navigate("add")
-                    },
-                    modifier = Modifier
-                      .align(Alignment.BottomEnd)
-                      .padding(24.dp)
-                  ) {
-                    Icon(
-                      imageVector = Icons.Rounded.Add,
-                      contentDescription = "Add device",
-                    )
-                  }
-                }
-              }
-            }
-            composable(
-              "chat/{deviceId}",
-              arguments = listOf(navArgument("deviceId") { type = NavType.StringType })
-            ) { backStackEntry ->
-              bleBinder?.let { binder ->
-                ChatScreen(
-                  binder, backStackEntry.arguments?.getString("deviceId")
-                ) {
-                  // Navigate to user info screen
-                  navController.navigate("user/$it")
-                }
-              }
-            }
-            composable("add") {
-              bleBinder?.let { binder ->
-                AddDeviceScreen(binder, moshi) { user ->
-                  if (user != null) {
-                    navController.navigate("user/${user}")
-                  } else {
-                    navController.popBackStack()
-                  }
-                }
-              }
-            }
-            composable(
-              "user/{deviceId}",
-              arguments = listOf(navArgument("deviceId") { type = NavType.StringType })
-            ) { backStackEntry ->
-              // User info screen
-              bleBinder?.let {
-                UserInfoScreen(
-                  it,
-                  backStackEntry.arguments?.getString("deviceId"),
-                  backStackEntry.arguments?.getString("deviceId") == userId,
-                  onBack = { navController.popBackStack() }
-                ) {
-                  navController.navigate("settings")
-                }
-              }
-            }
-            composable("settings") {
-              bleBinder?.let { binder ->
-                SettingsScreen(
-                  binder,
-                  startAdvertising = {
-                    startAdvertising()
-                  },
-                  stopAdvertising = {
-                    stopAdvertising()
-                  },
-                ) {
-                  navController.navigate("about")
-                }
-              }
-            }
-            composable("about") {
-              AboutScreen()
+            navController.navigate("home") {
+              popUpTo("home") { inclusive = true }
             }
           }
         }
@@ -371,13 +331,11 @@ class MainActivity : AppCompatActivity() {
   private val checkLocation = {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
       ContextCompat.checkSelfPermission(
-        this,
-        Manifest.permission.ACCESS_FINE_LOCATION
+        this, Manifest.permission.ACCESS_FINE_LOCATION
       ) == PackageManager.PERMISSION_GRANTED
     } else {
       ContextCompat.checkSelfPermission(
-        this,
-        Manifest.permission.ACCESS_COARSE_LOCATION
+        this, Manifest.permission.ACCESS_COARSE_LOCATION
       ) == PackageManager.PERMISSION_GRANTED
     }
   }
@@ -385,22 +343,16 @@ class MainActivity : AppCompatActivity() {
   private val checkBluetooth = {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
       ContextCompat.checkSelfPermission(
-        this,
-        Manifest.permission.BLUETOOTH_ADMIN
+        this, Manifest.permission.BLUETOOTH_ADMIN
       ) == PackageManager.PERMISSION_GRANTED
     } else {
       ContextCompat.checkSelfPermission(
-        this,
-        Manifest.permission.BLUETOOTH_ADVERTISE
-      ) == PackageManager.PERMISSION_GRANTED &&
-        ContextCompat.checkSelfPermission(
-          this,
-          Manifest.permission.BLUETOOTH_SCAN
-        ) == PackageManager.PERMISSION_GRANTED &&
-        ContextCompat.checkSelfPermission(
-          this,
-          Manifest.permission.BLUETOOTH_CONNECT
-        ) == PackageManager.PERMISSION_GRANTED
+        this, Manifest.permission.BLUETOOTH_ADVERTISE
+      ) == PackageManager.PERMISSION_GRANTED && ContextCompat.checkSelfPermission(
+        this, Manifest.permission.BLUETOOTH_SCAN
+      ) == PackageManager.PERMISSION_GRANTED && ContextCompat.checkSelfPermission(
+        this, Manifest.permission.BLUETOOTH_CONNECT
+      ) == PackageManager.PERMISSION_GRANTED
     }
   }
 

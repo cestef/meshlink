@@ -235,7 +235,7 @@ fun SendMessage(bleBinder: BleService.BleServiceBinder, deviceId: String) {
         .weight(1f)
         .padding(end = 8.dp)
         .align(Alignment.CenterVertically),
-      shape = MaterialTheme.shapes.medium,
+      shape = MaterialTheme.shapes.extraLarge,
       trailingIcon = {
         IconButton(onClick = { galleryLauncher.launch("image/*") }) {
           Icon(Icons.Filled.AttachFile, contentDescription = "Attach file")
@@ -254,6 +254,7 @@ fun SendMessage(bleBinder: BleService.BleServiceBinder, deviceId: String) {
         .size(56.dp)
         .align(Alignment.CenterVertically)
         .padding(top = 8.dp),
+      shape = MaterialTheme.shapes.large,
       elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp),
     ) {
       Icon(Icons.Filled.Send, contentDescription = "Send")

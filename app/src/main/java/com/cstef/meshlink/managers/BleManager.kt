@@ -99,14 +99,6 @@ class BleManager(
     clientManager.disconnect(userId)
   }
 
-  fun startScanning() {
-    if (canBeClient) clientManager.startScanning()
-  }
-
-  fun stopScanning() {
-    clientManager.stopScanning()
-  }
-
   fun startAdvertising() {
     if (canBeServer) serverManager.startAdvertising()
   }
@@ -122,10 +114,6 @@ class BleManager(
 
   fun openServer() {
     if (canBeServer) serverManager.openServer()
-  }
-
-  fun closeServer() {
-    serverManager.closeServer()
   }
 
   fun startClient() {
@@ -185,5 +173,6 @@ class BleManager(
     fun getKnownDevices(): List<Device> = emptyList()
     fun getAddressForUserId(userId: String): String = ""
     fun onUserAdded(userId: String)
+    fun connect(address: String) {}
   }
 }

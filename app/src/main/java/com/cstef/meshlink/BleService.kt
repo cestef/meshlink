@@ -188,6 +188,10 @@ class BleService : Service() {
     mutableMapOf() // userId -> messageId -> chunks
 
   private val bleDataExchangeManager = object : BleManager.BleDataExchangeManager {
+    override fun connect(address: String) {
+      bleManager.connect(address)
+    }
+
     override fun getKnownDevices(): List<Device> {
       return allDevices?.value ?: emptyList()
     }

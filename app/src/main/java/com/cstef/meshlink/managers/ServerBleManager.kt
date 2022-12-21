@@ -181,6 +181,21 @@ class ServerBleManager(
       super.onMtuChanged(device, mtu)
       Log.d("ServerBleManager", "onMtuChanged: $mtu")
     }
+
+    override fun onConnectionStateChange(device: BluetoothDevice?, status: Int, newState: Int) {
+      super.onConnectionStateChange(device, status, newState)
+      Log.d("ServerBleManager", "onConnectionStateChange: $status, $newState")
+      if (newState == BluetoothProfile.STATE_CONNECTED) {
+        // try to connect back
+        callbackHandler.post {
+          device?.address?.let { dataExchangeManager.connect(it) }
+        }
+      } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+        callbackHandler.post {
+          dataExchangeManager.onUserDisconnected(device?.address!!)
+        }
+      }
+    }
   }
 
   @SuppressLint("MissingPermission")

@@ -32,7 +32,7 @@ fun AddedDevice(
       .padding(8.dp)
       .fillMaxWidth()
       .clip(
-        MaterialTheme.shapes.medium,
+        MaterialTheme.shapes.large,
       )
       .combinedClickable(
         onClick = { onDeviceClick(device.userId) },

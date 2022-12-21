@@ -42,6 +42,7 @@ class ClientBleManager(
   private val parentManager: BleManager
 ) {
 
+  private var rssiUpdateJob: Job? = null
   private var userId: String? = null
   private val moshi = MoshiPack()
 
@@ -345,6 +346,27 @@ class ClientBleManager(
         }
       }
     }
+
+    @SuppressLint("MissingPermission")
+    override fun onReadRemoteRssi(gatt: BluetoothGatt?, rssi: Int, status: Int) {
+      super.onReadRemoteRssi(gatt, rssi, status)
+      Log.d(
+        "ClientBleManager",
+        "onReadRemoteRssi: rssi = $rssi, status == SUCCESS: ${status == BluetoothGatt.GATT_SUCCESS}, status=${status}, from: ${gatt?.device?.address}"
+      )
+      if (status == BluetoothGatt.GATT_SUCCESS) {
+        val userId =
+          connectedServersAddresses.entries.find { it.value == gatt?.device?.address }?.key
+        if (userId != null) {
+          callbackHandler.post {
+            dataExchangeManager.onUserRssiReceived(userId, rssi)
+          }
+        }
+      } else {
+        Log.e("ClientBleManager", "onReadRemoteRssi: failed to read rssi")
+        gatt?.disconnect()
+      }
+    }
   }
 
   fun stop() {
@@ -355,12 +377,13 @@ class ClientBleManager(
           context, Manifest.permission.BLUETOOTH_ADMIN
         ) == PackageManager.PERMISSION_GRANTED)
       ) {
-        _stopScanning()
+        stopScanning()
         disconnectAll()
       }
     }
     operationQueue.clear()
     chunksOperationQueue.clear()
+    rssiUpdateJob?.cancel()
   }
 
   @SuppressLint("MissingPermission")
@@ -510,13 +533,8 @@ class ClientBleManager(
     }
   }
 
-  fun startScanning() {
-    parentManager.isScanning.value = true
-    _startScanning()
-  }
-
   @SuppressLint("MissingPermission")
-  private fun _startScanning() {
+  private fun startScanning() {
     if (adapter.isBleOn) {
       scanner?.startScan(scanFilters, scanSettings, scanCallback)
       Log.d("ClientBleManager", "startScanning: started")
@@ -526,14 +544,8 @@ class ClientBleManager(
   }
 
   @SuppressLint("MissingPermission")
-  private fun _stopScanning() {
+  private fun stopScanning() {
     scanner?.stopScan(scanCallback)
-    Log.d("ClientBleManager", "stopScanning: stopped")
-  }
-
-  @SuppressLint("MissingPermission")
-  fun stopScanning() {
-    parentManager.isScanning.value = false
     Log.d("ClientBleManager", "stopScanning: stopped")
   }
 
@@ -541,8 +553,18 @@ class ClientBleManager(
     userId = id
   }
 
+  @SuppressLint("MissingPermission")
   fun start() {
-    _startScanning()
+    startScanning()
+    // Update remote rssi every 10 seconds
+    rssiUpdateJob = GlobalScope.launch(Dispatchers.IO) {
+      while (true) {
+        delay(10000)
+        connectedGattServers.values.forEach {
+          it.readRemoteRssi()
+        }
+      }
+    }
   }
 
   @SuppressLint("MissingPermission")

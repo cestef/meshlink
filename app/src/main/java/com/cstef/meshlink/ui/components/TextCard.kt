@@ -27,7 +27,7 @@ fun TextCard(
       .padding(
         start = if (isMine) 64.dp else 0.dp, end = if (isMine) 0.dp else 64.dp
       ),
-    shape = MaterialTheme.shapes.medium,
+    shape = MaterialTheme.shapes.large,
     elevation = CardDefaults.cardElevation(0.dp),
     colors = CardDefaults.outlinedCardColors(
       containerColor = if (isMine) {
