@@ -38,14 +38,10 @@ class BleService : Service() {
   }
 
   inner class BleServiceBinder : Binder() {
-    val encryptionManager: EncryptionManager
-      get() = this@BleService.encryptionManager
     val isAdvertising
       get() = bleManager.isAdvertising
     val service: BleService
       get() = this@BleService
-    val isScanning
-      get() = bleManager.isScanning
     val isDatabaseOpen: LiveData<Boolean>
       get() = this@BleService.isDatabaseOpen
     val isDatabaseOpening: LiveData<Boolean>
@@ -164,19 +160,6 @@ class BleService : Service() {
       bleManager.openServer()
     }
 
-    fun closeServer() {
-      bleManager.closeServer()
-    }
-
-    fun startScanning() {
-      // check permissions
-      bleManager.startScanning()
-    }
-
-    fun stopScanning() {
-      bleManager.stopScanning()
-    }
-
     fun startAdvertising() {
       bleManager.startAdvertising()
     }
@@ -223,14 +206,14 @@ class BleService : Service() {
       }
     }
 
-    override fun onUserConnected(userId: String, serverAddress: String?, publicKey: PublicKey?) {
+    override fun onUserConnected(userId: String, address: String?, publicKey: PublicKey?) {
       Log.d("BleService", "onUserConnected: $userId")
       val devices = allDevices?.value ?: emptyList()
       if (!devices.any { it.userId == userId }) {
         deviceRepository?.insert(
           Device(
             userId = userId,
-            address = serverAddress,
+            address = address,
             rssi = 0,
             lastSeen = System.currentTimeMillis(),
             connected = true,
@@ -244,7 +227,7 @@ class BleService : Service() {
         devices.find { it.userId == userId }?.let { device ->
           deviceRepository?.update(
             device.copy(
-              address = serverAddress,
+              address = address,
               rssi = 0,
               lastSeen = System.currentTimeMillis(),
               connected = true,
@@ -270,6 +253,10 @@ class BleService : Service() {
         "BleService",
         "onChunkReceived: chunk.index: ${chunk.index}, chunk.data.size: ${chunk.data.size}, chunk.messageId: ${chunk.messageId}"
       )
+      // check if we are already connected as a client to this address, if not, connect
+      if (!bleManager.isConnected(address) && !bleManager.isConnecting(address)) {
+        bleManager.connect(address)
+      }
       // is user blocked?
       val devices = allDevices?.value ?: emptyList()
       val device = devices.find { it.userId == getUserIdForAddress(address) }

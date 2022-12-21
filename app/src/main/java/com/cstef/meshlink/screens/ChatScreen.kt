@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Send
@@ -20,7 +19,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.dp
@@ -178,14 +176,11 @@ fun Messages(
   deviceId: String
 ) {
   val messages by bleBinder.allMessages.observeAsState(listOf())
-  val (hasNewMessage, setHasNewMessage) = remember { mutableStateOf(false) }
   val scrollState = rememberLazyListState()
-  // on first composition, get the messages from the bleBinder
-  if (hasNewMessage) {
-    LaunchedEffect(Unit) {
-      // Scroll to the bottom of the list, not with scrollState.maxValue because the list is infinite
-      scrollState.scrollToItem(messages.size - 1)
-      setHasNewMessage(false)
+  // on messages change, scroll to the bottom of the list
+  LaunchedEffect(messages) {
+    if (messages.isNotEmpty()) {
+      scrollState.animateScrollToItem(messages.size - 1)
     }
   }
   LazyColumn(

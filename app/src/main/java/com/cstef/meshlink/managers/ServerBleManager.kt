@@ -91,6 +91,7 @@ class ServerBleManager(
       characteristic: BluetoothGattCharacteristic?
     ) {
       super.onCharacteristicReadRequest(device, requestId, offset, characteristic)
+      Log.d("ServerBleManager", "onCharacteristicReadRequest: from ${device?.address}")
       when (characteristic?.uuid.toString()) {
         BleUuid.USER_ID_UUID -> {
           callbackHandler.post {

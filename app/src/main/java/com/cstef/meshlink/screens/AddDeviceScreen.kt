@@ -38,6 +38,15 @@ fun AddDeviceScreen(
     mutableStateOf("")
   }
   val devices by bleBinder.allDevices.observeAsState(listOf())
+  val noDevicesNearbyMessage = remember {
+    val messages = listOf(
+      "No devices nearby :(",
+      "It's empty here...",
+      "No devices found :(",
+      "I did my best, but I couldn't find any devices :(",
+    )
+    messages.random()
+  }
   Column(modifier = Modifier.fillMaxSize()) {
     TopAppBar(
       title = { Text(text = "Nearby devices") },
@@ -65,12 +74,12 @@ fun AddDeviceScreen(
           .weight(1f)
       ) {
         Text(
-          text = "No devices nearby :(",
+          text = noDevicesNearbyMessage,
           style = MaterialTheme.typography.titleLarge,
           textAlign = TextAlign.Center,
           modifier = Modifier
             .align(Alignment.Center)
-            .padding(bottom = 64.dp),
+            .padding(vertical = 32.dp, horizontal = 16.dp),
           color = if (isSystemInDarkTheme()) DarkColors.onBackground else LightColors.onBackground
         )
       }

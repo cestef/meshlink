@@ -5,13 +5,11 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import androidx.compose.runtime.mutableStateOf
-import com.cstef.meshlink.BleService
 import com.cstef.meshlink.db.entities.Device
 import com.cstef.meshlink.util.struct.Chunk
 import com.cstef.meshlink.util.struct.Message
@@ -133,6 +131,18 @@ class BleManager(
   fun startClient() {
     if (canBeClient) clientManager.start()
   }
+
+  fun connect(address: String) {
+    clientManager.connect(address)
+  }
+
+  fun isConnected(address: String): Boolean {
+    return clientManager.connectedGattServers.containsKey(address)
+  }
+
+  fun isConnecting(address: String): Boolean {
+    return clientManager.connectingGattServers.contains(address)
+  }
 //  fun sendIsWriting(userId: String, writing: Boolean) {
 //    val deviceAddress = clientManager.connectedServersAddresses[userId]
 //    if (deviceAddress != null && clientManager.connectedGattServers.containsKey(deviceAddress)) {
@@ -159,13 +169,12 @@ class BleManager(
     /**
      * @param userId ID of the remote BLE device
      */
-    fun onUserConnected(userId: String, serverAddress: String?, publicKey: PublicKey?) {}
+    fun onUserConnected(userId: String, address: String?, publicKey: PublicKey?) {}
 
     /**
      * @param userId ID of the remote BLE device
      */
     fun onUserDisconnected(userId: String) {}
-    fun onUserPublicKeyReceived(userId: String, serverAddress: String, publicKey: PublicKey) {}
     fun getUsername(): String = ""
     fun getPublicKeyForUser(recipientId: String): PublicKey?
     fun onUserRssiReceived(userId: String, rssi: Int) {}

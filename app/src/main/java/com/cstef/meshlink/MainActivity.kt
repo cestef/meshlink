@@ -190,7 +190,7 @@ class MainActivity : AppCompatActivity() {
             },
             dismissButton = {
               TextButton(
-                onClick = { finish() },
+                onClick = { bleBinder?.openDatabase("") },
                 content = { Text(text = "Cancel") }
               )
             }

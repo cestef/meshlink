@@ -52,6 +52,7 @@ class ClientBleManager(
 
   // references of the connected servers are kept so they can by manually
   // disconnected if this manager is stopped
+  val connectingGattServers = mutableSetOf<String>()
   val connectedGattServers = mutableMapOf<String, BluetoothGatt>()
   val connectedServersAddresses = mutableMapOf<String, String>()
 
@@ -97,6 +98,7 @@ class ClientBleManager(
           return@execute
         } else {
           Log.d("ClientBleManager", "Connecting to ${device.address}")
+          connectingGattServers.add(device.address)
           device.connectGatt(
             context, false, gattCallback, BluetoothDevice.TRANSPORT_LE
           )
@@ -119,6 +121,7 @@ class ClientBleManager(
                   "onConnectionStateChange: Disconnected from ${gatt.device.address}"
                 )
                 connectedGattServers.remove(gatt.device.address)
+                connectingGattServers.remove(gatt.device.address)
                 val serverId =
                   connectedServersAddresses.entries.find { it.value == gatt.device.address }?.key
                 if (serverId != null) {
@@ -148,6 +151,7 @@ class ClientBleManager(
                     dataExchangeManager.onMessageSendFailed(serverId, "Connection error")
                   }
                   connectedServersAddresses.remove(serverId)
+                  connectingGattServers.remove(gatt.device.address)
                   dataExchangeManager.onUserDisconnected(serverId)
                 }
                 gatt.disconnect()
@@ -160,6 +164,7 @@ class ClientBleManager(
             Log.d(
               "ClientBleManager", "onConnectionStateChange: Connected to ${gatt.device.address}"
             )
+            connectingGattServers.remove(gatt.device.address)
             connectedGattServers[gatt.device.address] = gatt
             operationQueue.execute { gatt.requestMtu(512) }
           }
@@ -171,7 +176,10 @@ class ClientBleManager(
               "onConnectionStateChange: disconnected from ${connectedServersAddresses[gatt.device.address]}"
             )
             connectedGattServers.remove(gatt.device.address)
-            connectedServersAddresses.remove(gatt.device.address)
+            connectingGattServers.remove(gatt.device.address)
+            val serverId =
+              connectedServersAddresses.entries.find { it.value == gatt.device.address }?.key
+            connectedServersAddresses.remove(serverId)
             gatt.close()
           }
         }
@@ -222,7 +230,10 @@ class ClientBleManager(
       gatt: BluetoothGatt?, characteristic: BluetoothGattCharacteristic?, status: Int
     ) {
       super.onCharacteristicRead(gatt, characteristic, status)
-      Log.d("ClientBleManager", "onCharacteristicRead: ${characteristic?.uuid.toString()}")
+      Log.d(
+        "ClientBleManager",
+        "onCharacteristicRead: ${characteristic?.uuid.toString()}, from ${gatt?.device?.address}"
+      )
       operationQueue.operationComplete()
       if (status == BluetoothGatt.GATT_SUCCESS) {
         when (characteristic?.uuid?.toString()) {
@@ -272,7 +283,7 @@ class ClientBleManager(
       super.onCharacteristicWrite(gatt, characteristic, status)
       Log.d(
         "ClientBleManager",
-        "onCharacteristicWrite: ${characteristic?.uuid.toString()} status == SUCCESS: ${status == BluetoothGatt.GATT_SUCCESS}, status=${status}"
+        "onCharacteristicWrite: ${characteristic?.uuid.toString()} status == SUCCESS: ${status == BluetoothGatt.GATT_SUCCESS}, status=${status}, to: ${gatt?.device?.address}"
       )
       chunksOperationQueue.operationComplete()
 
@@ -532,6 +543,18 @@ class ClientBleManager(
 
   fun start() {
     _startScanning()
+  }
+
+  @SuppressLint("MissingPermission")
+  fun connect(address: String) {
+    val device = adapter?.getRemoteDevice(address)
+    if (device != null) {
+      device.connectGatt(
+        context, false, gattCallback, BluetoothDevice.TRANSPORT_LE
+      )
+    } else {
+      Log.w("ClientBleManager", "connect: device is null")
+    }
   }
 
 //  @SuppressLint("MissingPermission")
