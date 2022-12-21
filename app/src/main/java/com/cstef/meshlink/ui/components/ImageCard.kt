@@ -32,26 +32,34 @@ import com.cstef.meshlink.ui.theme.LightColors
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun ImageCard(isMine: Boolean, content: String) {
-  val image = remember { Base64.decode(content, Base64.DEFAULT) }
-  val bitmap = remember { BitmapFactory.decodeByteArray(image, 0, image.size) }
-  val imageBitmap = remember { bitmap.asImageBitmap() }
+  val image = remember {
+    try {
+      Base64.decode(content, Base64.DEFAULT)
+    } catch (e: Exception) {
+      null
+    }
+  }
+  val bitmap = remember { image?.let { BitmapFactory.decodeByteArray(image, 0, it.size) } }
+  val imageBitmap = remember { bitmap?.asImageBitmap() }
   val (isFullScreen, setFullScreen) = remember { mutableStateOf(false) }
   val context = LocalContext.current
   if (!isFullScreen) {
-    Image(
-      bitmap = imageBitmap, contentDescription = null,
-      modifier = Modifier
-        .padding(8.dp)
-        .fillMaxWidth()
-        .height(300.dp)
-        .padding(
-          start = if (isMine) 64.dp else 0.dp, end = if (isMine) 0.dp else 64.dp
-        )
-        .clip(MaterialTheme.shapes.medium)
-        .clickable {
-          setFullScreen(true)
-        },
-    )
+    if (imageBitmap != null) {
+      Image(
+        bitmap = imageBitmap, contentDescription = null,
+        modifier = Modifier
+          .padding(8.dp)
+          .fillMaxWidth()
+          .height(300.dp)
+          .padding(
+            start = if (isMine) 64.dp else 0.dp, end = if (isMine) 0.dp else 64.dp
+          )
+          .clip(MaterialTheme.shapes.large)
+          .clickable {
+            setFullScreen(true)
+          },
+      )
+    }
   } else {
     Dialog(
       onDismissRequest = { setFullScreen(false) },
@@ -59,48 +67,57 @@ fun ImageCard(isMine: Boolean, content: String) {
         dismissOnBackPress = true, dismissOnClickOutside = false, usePlatformDefaultWidth = false
       ),
       content = {
-        Row(
-          modifier = Modifier.fillMaxSize(),
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.SpaceBetween
+        Column(
+          modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight()
+            .padding(16.dp)
         ) {
-          IconButton(
-            onClick = { setFullScreen(false) },
-            modifier = Modifier.padding(8.dp)
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
           ) {
-            Icon(
-              imageVector = Icons.Rounded.Close,
-              contentDescription = null,
-              tint = if (isSystemInDarkTheme()) DarkColors.primary else LightColors.primary
-            )
-          }
-          IconButton(
-            onClick = {
-              val shareIntent = Intent().apply {
-                action = Intent.ACTION_SEND
-                putExtra(Intent.EXTRA_STREAM, image)
-                type = "image/*"
-              }
-              context.startActivity(Intent.createChooser(shareIntent, "Share image"))
-            },
-            modifier = Modifier.padding(8.dp)
-          ) {
-            Icon(
-              imageVector = Icons.Rounded.Share,
-              contentDescription = "Share image",
-              tint = if (isSystemInDarkTheme()) DarkColors.primary else LightColors.primary
-            )
-          }
-          Image(
-            bitmap = imageBitmap, contentDescription = null,
-            modifier = Modifier
-              .padding(8.dp)
-              .fillMaxSize()
-              .clip(RoundedCornerShape(10.dp))
-              .clickable {
-                setFullScreen(false)
+            IconButton(
+              onClick = { setFullScreen(false) },
+              modifier = Modifier.padding(8.dp)
+            ) {
+              Icon(
+                imageVector = Icons.Rounded.Close,
+                contentDescription = null,
+                tint = if (isSystemInDarkTheme()) DarkColors.onSurface else LightColors.onSurface
+              )
+            }
+            IconButton(
+              onClick = {
+                val shareIntent = Intent().apply {
+                  action = Intent.ACTION_SEND
+                  putExtra(Intent.EXTRA_STREAM, image)
+                  type = "image/*"
+                }
+                context.startActivity(Intent.createChooser(shareIntent, "Share image"))
               },
-          )
+              modifier = Modifier.padding(8.dp)
+            ) {
+              Icon(
+                imageVector = Icons.Rounded.Share,
+                contentDescription = "Share image",
+                tint = if (isSystemInDarkTheme()) DarkColors.onSurface else LightColors.onSurface
+              )
+            }
+          }
+          if (imageBitmap != null) {
+            Image(
+              bitmap = imageBitmap, contentDescription = null,
+              modifier = Modifier
+                .padding(8.dp)
+                .fillMaxSize()
+                .clip(RoundedCornerShape(10.dp))
+                .clickable {
+                  setFullScreen(false)
+                },
+            )
+          }
         }
       },
     )
