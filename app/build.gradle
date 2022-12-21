@@ -22,8 +22,8 @@ android {
     applicationId "com.cstef.meshlink"
     minSdk 23
     targetSdk 33
-    versionCode 23
-    versionName "1.1.10"
+    versionCode 25
+    versionName "1.1.11"
     testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
   }
 
