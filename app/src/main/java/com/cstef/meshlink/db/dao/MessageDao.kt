@@ -22,5 +22,5 @@ interface MessageDao {
   fun deleteAll()
 
   @Query("DELETE FROM messages WHERE sender_id = :userId OR recipient_id = :userId")
-  fun delete(userId: String)
+  fun deleteFromUser(userId: String)
 }

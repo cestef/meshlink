@@ -17,7 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.cstef.meshlink.BleService
+import androidx.lifecycle.LiveData
+import com.cstef.meshlink.db.entities.Device
 import com.cstef.meshlink.ui.components.AvailableDevice
 import com.cstef.meshlink.util.struct.QrData
 import com.daveanthonythomas.moshipack.MoshiPack
@@ -27,20 +28,22 @@ import com.journeyapps.barcodescanner.ScanOptions
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddDeviceScreen(
-  bleBinder: BleService.BleServiceBinder,
-  moshi: MoshiPack,
+  allDevices: LiveData<List<Device>>,
+  addDevice: (userId: String) -> Unit,
   onBack: (String?) -> Unit,
 ) {
+  val moshi = remember { MoshiPack() }
   val (error, setError) = remember {
     mutableStateOf("")
   }
-  val devices by bleBinder.allDevices.observeAsState(listOf())
+  val devices by allDevices.observeAsState(listOf())
   val noDevicesNearbyMessage = remember {
     val messages = listOf(
       "No devices nearby :(",
       "It's empty here...",
       "No devices found :(",
-      "I did my best, but I couldn't find any devices :(",
+      "Try walking around a bit",
+      "Is there anyone here ?",
     )
     messages.random()
   }
@@ -59,7 +62,7 @@ fun AddDeviceScreen(
           devices.filter { it.connected && !it.added }
         ) { device ->
           AvailableDevice(device = device, onDeviceClick = {
-            bleBinder.setDeviceAdded(device.userId)
+            addDevice(device.userId)
             onBack(null)
           })
         }
@@ -97,11 +100,11 @@ fun AddDeviceScreen(
               "AddDeviceScreen",
               "userId: $otherUserId"
             )
-            bleBinder.addDevice(otherUserId)
+            addDevice(otherUserId)
             onBack(otherUserId)
           } catch (e: Exception) {
             Log.e("AddDeviceScreen", "Error parsing QR code", e)
-            setError("Invalid QR code (parsing)")
+            setError("Invalid QR code")
           }
         }
       }

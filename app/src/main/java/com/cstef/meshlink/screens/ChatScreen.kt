@@ -20,9 +20,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.LiveData
 import com.caverock.androidsvg.SVG
-import com.cstef.meshlink.BleService
+import com.cstef.meshlink.db.entities.Device
 import com.cstef.meshlink.ui.components.ChatMessage
 import com.cstef.meshlink.util.generateBeamSVG
 import com.cstef.meshlink.util.struct.Message
@@ -31,11 +34,13 @@ import com.cstef.meshlink.util.struct.Message
 @ExperimentalMaterial3Api
 @Composable
 fun ChatScreen(
-  bleBinder: BleService.BleServiceBinder,
   deviceId: String?,
+  allMessages: LiveData<List<com.cstef.meshlink.db.entities.Message>>,
+  allDevices: LiveData<List<Device>>,
+  sendMessage: (content: String, type: String) -> Unit,
   onUserClick: (String) -> Unit,
 ) {
-  val devices by bleBinder.allDevices.observeAsState(listOf())
+  val devices by allDevices.observeAsState(listOf())
   val device = devices.find { it.userId == deviceId }
   Column(
     modifier = Modifier.fillMaxSize()
@@ -105,19 +110,20 @@ fun ChatScreen(
       Messages(
         Modifier
           .weight(1f)
-          .fillMaxSize(), bleBinder,
-        deviceId
+          .fillMaxSize(),
+        deviceId,
+        allMessages
       )
-      SendMessage(bleBinder, deviceId)
+      SendMessage { content, type ->
+        sendMessage(content, type)
+      }
     }
   }
 }
 
 @Composable
 fun Avatar(
-  deviceId: String,
-  modifier: Modifier = Modifier,
-  onClick: (() -> Unit)? = null
+  deviceId: String, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null
 ) {
   Canvas(modifier = if (onClick != null) (modifier.clickable { onClick() }) else modifier) {
     drawIntoCanvas { canvas ->
@@ -163,10 +169,10 @@ fun Avatar(
 @Composable
 fun Messages(
   modifier: Modifier = Modifier,
-  bleBinder: BleService.BleServiceBinder,
-  deviceId: String
+  deviceId: String,
+  allMessages: LiveData<List<com.cstef.meshlink.db.entities.Message>>
 ) {
-  val messages by bleBinder.allMessages.observeAsState(listOf())
+  val messages by allMessages.observeAsState(listOf())
   val scrollState = rememberLazyListState()
   // on messages change, scroll to the bottom of the list
   LaunchedEffect(messages) {
@@ -192,16 +198,17 @@ fun Messages(
 
 @ExperimentalMaterial3Api
 @Composable
-fun SendMessage(bleBinder: BleService.BleServiceBinder, deviceId: String) {
+fun SendMessage(sendMessage: (content: String, type: String) -> Unit) {
   val (text, setText) = remember { mutableStateOf("") }
+  val context = LocalContext.current
   val galleryLauncher =
     rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
       if (uri != null) {
-        val stream = bleBinder.service.contentResolver.openInputStream(uri)
+        val stream = context.contentResolver.openInputStream(uri)
         val bytes = stream?.readBytes()
         if (bytes != null) {
           val base64 = Base64.encodeToString(bytes, Base64.DEFAULT)
-          bleBinder.sendMessage(deviceId, base64, Message.Type.IMAGE)
+          sendMessage(base64, Message.Type.IMAGE)
         }
       }
     }
@@ -233,7 +240,7 @@ fun SendMessage(bleBinder: BleService.BleServiceBinder, deviceId: String) {
     FloatingActionButton(
       onClick = {
         if (text.isNotEmpty()) {
-          bleBinder.sendMessage(deviceId, text, Message.Type.TEXT)
+          sendMessage(text, Message.Type.TEXT)
           setText("")
         }
       },
@@ -247,4 +254,10 @@ fun SendMessage(bleBinder: BleService.BleServiceBinder, deviceId: String) {
       Icon(Icons.Filled.Send, contentDescription = "Send")
     }
   }
+}
+
+@Preview
+@Composable
+fun PreviewChat() {
+
 }

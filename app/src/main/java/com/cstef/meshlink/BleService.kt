@@ -135,11 +135,11 @@ class BleService : Service() {
       bleManager.disconnectAll()
     }
 
-    fun deleteDataForUser(device: Device) {
-      deviceRepository?.delete(device)
-      messageRepository?.delete(device.userId)
+    fun deleteDataForUser(userId: String) {
+      deviceRepository?.delete(userId)
+      messageRepository?.delete(userId)
       // Disconnect from device
-      bleManager.disconnect(device.userId)
+      bleManager.disconnect(userId)
     }
 
     fun changeDatabasePassword(newPassword: String): Boolean {
@@ -170,16 +170,6 @@ class BleService : Service() {
 
     fun startClient() {
       bleManager.startClient()
-    }
-
-    fun setDeviceAdded(userId: String) {
-      val device = allDevices.value?.find { it.userId == userId }
-      if (device != null) {
-        deviceRepository?.update(device.copy(added = true))
-      } else {
-        Log.e("BleService", "Device not found")
-        Toast.makeText(this@BleService, "Device not found", Toast.LENGTH_SHORT).show()
-      }
     }
   }
 

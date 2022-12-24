@@ -23,8 +23,8 @@ class DeviceRepository(
     coroutineScope.launch(Dispatchers.IO) { deviceDao.update(device) }
   }
 
-  fun delete(device: Device) {
-    coroutineScope.launch(Dispatchers.IO) { deviceDao.delete(device) }
+  fun delete(userId: String) {
+    coroutineScope.launch(Dispatchers.IO) { deviceDao.delete(userId) }
   }
 
   fun deleteAll() {

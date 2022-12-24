@@ -17,8 +17,7 @@ import com.cstef.meshlink.db.entities.Device
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AvailableDevice(
-  device: Device,
-  onDeviceClick: (deviceId: String) -> Unit = {}
+  device: Device, onDeviceClick: (deviceId: String) -> Unit = {}
 ) {
   Card(
     modifier = Modifier

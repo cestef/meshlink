@@ -12,20 +12,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.cstef.meshlink.BleService
+import androidx.lifecycle.LiveData
+import com.cstef.meshlink.db.entities.Device
 import com.cstef.meshlink.ui.components.AddedDevice
 import com.cstef.meshlink.ui.components.DeviceID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-  bleBinder: BleService.BleServiceBinder,
+  allDevices: LiveData<List<Device>>,
   userId: String,
   onSelfClick: () -> Unit,
   onDeviceLongClick: (deviceId: String) -> Unit,
   onDeviceSelected: (deviceId: String) -> Unit,
 ) {
-  val devices by bleBinder.allDevices.observeAsState()
+  val devices by allDevices.observeAsState(listOf())
   Column(modifier = Modifier.fillMaxSize()) {
     TopAppBar(title = {
       Row(modifier = Modifier.fillMaxWidth()) {

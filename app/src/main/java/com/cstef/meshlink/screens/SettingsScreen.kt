@@ -5,10 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -17,14 +14,16 @@ import androidx.compose.ui.unit.dp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-  bleBinder: BleService.BleServiceBinder,
+  isAdvertising: MutableState<Boolean>,
   startAdvertising: () -> Unit,
   stopAdvertising: () -> Unit,
   goToAbout: () -> Unit,
+  deleteAllData: () -> Unit,
+  changeDatabasePassword: (password: String) -> Boolean,
 ) {
   val colors = MaterialTheme.colorScheme
   val context = LocalContext.current
-  val isAdvertising by bleBinder.isAdvertising
+  val advertising by isAdvertising
   TopAppBar(
     title = { Text(text = "Settings") },
     modifier = Modifier
@@ -50,7 +49,7 @@ fun SettingsScreen(
         style = MaterialTheme.typography.bodyLarge
       )
       Switch(
-        checked = isAdvertising,
+        checked = advertising,
         onCheckedChange = {
           if (it) {
             startAdvertising()
@@ -94,7 +93,7 @@ fun SettingsScreen(
         text = { Text("Are you sure you want to delete all data?") },
         confirmButton = {
           Button(onClick = {
-            bleBinder.deleteAllData()
+            deleteAllData()
             setConfirmDelete(false)
           }) {
             Text("Delete")
@@ -129,7 +128,7 @@ fun SettingsScreen(
         text = { Text("Are you sure you want to delete the password?") },
         confirmButton = {
           Button(onClick = {
-            val success = bleBinder.changeDatabasePassword("")
+            val success = changeDatabasePassword("")
             if (success) {
               setConfirmDeletePassword(false)
             } else {
@@ -179,7 +178,7 @@ fun SettingsScreen(
             setPasswordDialogVisible(false)
             setConfirmDeletePassword(true)
           } else {
-            val success = bleBinder.changeDatabasePassword(newPassword)
+            val success = changeDatabasePassword(newPassword)
             if (success) {
               setPasswordDialogVisible(false)
             } else {

@@ -1,5 +1,6 @@
 package com.cstef.meshlink.screens
 
+import android.content.Context
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -11,19 +12,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import com.cstef.meshlink.BleService
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PasswordScreen(
-  binder: BleService.BleServiceBinder,
   firstTime: Boolean,
-  isDatabaseOpening: Boolean
+  isDatabaseOpening: Boolean,
+  openDatabase: (password: String) -> Unit,
 ) {
+  val context = LocalContext.current
   if (isDatabaseOpening) {
     AlertDialog(onDismissRequest = {},
       title = { Text(text = "Opening database...") },
@@ -74,17 +76,18 @@ fun PasswordScreen(
       confirmButton = {
         Button(
           onClick = {
-            if (masterPassword.isNotEmpty()) {
-              binder.openDatabase(masterPassword)
+            if (firstTime) {
+              val sharedPreferences =
+                context.getSharedPreferences("USER_SETTINGS", Context.MODE_PRIVATE)
+              if (masterPassword.isEmpty()) {
+                sharedPreferences.edit().putBoolean("is_default_password", true).apply()
+              } else {
+                sharedPreferences.edit().putBoolean("is_default_password", false).apply()
+              }
             }
+            openDatabase(masterPassword)
           },
           content = { Text(text = "Confirm") }
-        )
-      },
-      dismissButton = {
-        TextButton(
-          onClick = { binder.openDatabase("") },
-          content = { Text(text = "Cancel") }
         )
       }
     )

@@ -18,7 +18,7 @@ class MessageRepository(private val messageDao: MessageDao) {
   }
 
   fun delete(userId: String) {
-    coroutineScope.launch(Dispatchers.IO) { messageDao.delete(userId) }
+    coroutineScope.launch(Dispatchers.IO) { messageDao.deleteFromUser(userId) }
   }
 }
 

@@ -29,7 +29,8 @@ abstract class AppDatabase : RoomDatabase() {
 
     fun getInstance(context: Context, passphrase: String?): AppDatabase {
       if (INSTANCE == null) {
-        val bytes = SQLiteDatabase.getBytes(passphrase?.toCharArray() ?: "M3shL1nk".toCharArray())
+        val bytes =
+          SQLiteDatabase.getBytes(if (passphrase == null || passphrase.isEmpty()) "M3shL1nk".toCharArray() else passphrase.toCharArray())
         val factory = SupportFactory(bytes)
         INSTANCE = Room.databaseBuilder(
           context,

@@ -3,8 +3,6 @@ package com.cstef.meshlink.screens
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Done
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -15,23 +13,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.cstef.meshlink.BleService
+import androidx.lifecycle.LiveData
+import com.cstef.meshlink.db.entities.Device
 import com.cstef.meshlink.ui.components.DeviceID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserInfoScreen(
-  bleBinder: BleService.BleServiceBinder,
+  allDevices: LiveData<List<Device>>,
   userId: String?,
+  publicKey: String?,
   isMe: Boolean,
   onBack: () -> Unit,
   openSettings: () -> Unit,
+  blockUser: () -> Unit,
+  unblockUser: () -> Unit,
+  deleteDataForUser: () -> Unit,
 ) {
   val context = LocalContext.current
   val colors = MaterialTheme.colorScheme
   val devices by allDevices.observeAsState(listOf())
   val device = devices.find { it.userId == userId }
-  // Display user info: Avatar, userID, public key, block/unblock button (if not me), delete data button (if me), rename text field (if not me)
   Column(modifier = Modifier.fillMaxSize()) {
     if (userId != null) {
       Avatar(
@@ -42,14 +44,17 @@ fun UserInfoScreen(
           .align(Alignment.CenterHorizontally)
       )
       DeviceID(
-        userId = userId, isMe = isMe, blocked = device?.blocked ?: false, modifier = Modifier
+        userId = userId,
+        isMe = isMe,
+        blocked = device?.blocked ?: false,
+        modifier = Modifier
           .padding(16.dp)
           .fillMaxWidth()
           .align(Alignment.CenterHorizontally)
       )
       if (device?.name != null) {
         Text(
-          text = "$userId",
+          text = userId,
           style = MaterialTheme.typography.bodyLarge,
           modifier = Modifier
             .padding(bottom = 16.dp)
@@ -57,7 +62,7 @@ fun UserInfoScreen(
           color = colors.onBackground
         )
       }
-      bleBinder.getPublicKeySignature(userId).let {
+      publicKey?.let {
         Text(
           text = "Public key",
           style = MaterialTheme.typography.titleMedium,
@@ -87,7 +92,8 @@ fun UserInfoScreen(
       }
       if (!isMe) {
         val (newName, setNewName) = remember { mutableStateOf(device?.name ?: "") }
-        OutlinedTextField(value = newName,
+        OutlinedTextField(
+          value = newName,
           onValueChange = {
             setNewName(it)
           },
@@ -95,18 +101,8 @@ fun UserInfoScreen(
           modifier = Modifier
             .padding(top = 16.dp, bottom = 16.dp)
             .align(Alignment.CenterHorizontally),
-          singleLine = true,
-          trailingIcon = {
-            if (!isMe) {
-              IconButton(onClick = {
-                bleBinder.updateDeviceName(userId, newName)
-              }) {
-                Icon(
-                  imageVector = Icons.Default.Done, contentDescription = "Done"
-                )
-              }
-            }
-          })
+          singleLine = true
+        )
         val (chooseDeleteMode, setChooseDeleteMode) = remember { mutableStateOf(false) }
         if (chooseDeleteMode) {
           AlertDialog(onDismissRequest = { setChooseDeleteMode(false) },
@@ -115,7 +111,7 @@ fun UserInfoScreen(
             confirmButton = {
               Button(onClick = {
                 if (device != null) {
-                  bleBinder.deleteDataForUser(device)
+                  deleteDataForUser()
                 }
                 setChooseDeleteMode(false)
                 onBack()
@@ -144,9 +140,9 @@ fun UserInfoScreen(
           Button(
             onClick = {
               if (device?.blocked == true) {
-                bleBinder.unblockUser(userId)
+                unblockUser()
               } else {
-                bleBinder.blockUser(userId)
+                blockUser()
               }
             }, modifier = Modifier.padding(start = 16.dp)
           ) {
