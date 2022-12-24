@@ -1,6 +1,5 @@
 package com.cstef.meshlink.screens
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,8 +15,6 @@ import androidx.compose.ui.unit.dp
 import com.cstef.meshlink.BleService
 import com.cstef.meshlink.ui.components.AddedDevice
 import com.cstef.meshlink.ui.components.DeviceID
-import com.cstef.meshlink.ui.theme.DarkColors
-import com.cstef.meshlink.ui.theme.LightColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,7 +68,7 @@ fun HomeScreen(
           modifier = Modifier
             .align(Alignment.Center)
             .padding(bottom = 64.dp),
-          color = if (isSystemInDarkTheme()) DarkColors.onBackground else LightColors.onBackground
+          color = MaterialTheme.colorScheme.onBackground
         )
       }
     }

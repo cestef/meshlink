@@ -2,7 +2,6 @@ package com.cstef.meshlink.ui.components
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,8 +16,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cstef.meshlink.db.entities.Device
-import com.cstef.meshlink.ui.theme.DarkColors
-import com.cstef.meshlink.ui.theme.LightColors
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -39,14 +36,14 @@ fun AddedDevice(
         onLongClick = { onDeviceLongClick(device.userId) }),
     colors = CardDefaults.cardColors(
       containerColor = if (device.connected) {
-        if (isSystemInDarkTheme()) DarkColors.primaryContainer else LightColors.primaryContainer
+        MaterialTheme.colorScheme.primaryContainer
       } else {
-        if (isSystemInDarkTheme()) DarkColors.secondaryContainer else LightColors.secondaryContainer
+        MaterialTheme.colorScheme.secondaryContainer
       },
       contentColor = if (device.connected) {
-        if (isSystemInDarkTheme()) DarkColors.onPrimaryContainer else LightColors.onPrimaryContainer
+        MaterialTheme.colorScheme.onPrimaryContainer
       } else {
-        if (isSystemInDarkTheme()) DarkColors.onSecondaryContainer else LightColors.onSecondaryContainer
+        MaterialTheme.colorScheme.onSecondaryContainer
       }
     )
   ) {

@@ -3,7 +3,6 @@ package com.cstef.meshlink.screens
 import android.util.Base64
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,8 +19,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cstef.meshlink.BleService
 import com.cstef.meshlink.ui.components.AvailableDevice
-import com.cstef.meshlink.ui.theme.DarkColors
-import com.cstef.meshlink.ui.theme.LightColors
 import com.cstef.meshlink.util.struct.QrData
 import com.daveanthonythomas.moshipack.MoshiPack
 import com.journeyapps.barcodescanner.ScanContract
@@ -80,7 +77,7 @@ fun AddDeviceScreen(
           modifier = Modifier
             .align(Alignment.Center)
             .padding(vertical = 32.dp, horizontal = 16.dp),
-          color = if (isSystemInDarkTheme()) DarkColors.onBackground else LightColors.onBackground
+          color = MaterialTheme.colorScheme.onBackground
         )
       }
     }
@@ -131,7 +128,7 @@ fun AddDeviceScreen(
       Text(
         text = error,
         modifier = Modifier.padding(16.dp),
-        color = if (isSystemInDarkTheme()) DarkColors.error else LightColors.error
+        color = MaterialTheme.colorScheme.error
       )
     }
   }

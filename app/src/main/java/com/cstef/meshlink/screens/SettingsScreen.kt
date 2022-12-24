@@ -1,7 +1,6 @@
 package com.cstef.meshlink.screens
 
 import android.widget.Toast
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
@@ -14,9 +13,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.cstef.meshlink.BleService
-import com.cstef.meshlink.ui.theme.DarkColors
-import com.cstef.meshlink.ui.theme.LightColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,7 +22,7 @@ fun SettingsScreen(
   stopAdvertising: () -> Unit,
   goToAbout: () -> Unit,
 ) {
-  val colors = if (isSystemInDarkTheme()) DarkColors else LightColors
+  val colors = MaterialTheme.colorScheme
   val context = LocalContext.current
   val isAdvertising by bleBinder.isAdvertising
   TopAppBar(

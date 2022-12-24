@@ -21,7 +21,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
@@ -40,8 +39,6 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.cstef.meshlink.screens.*
 import com.cstef.meshlink.ui.theme.AppTheme
-import com.cstef.meshlink.ui.theme.DarkColors
-import com.cstef.meshlink.ui.theme.LightColors
 import com.cstef.meshlink.util.generateFriendlyId
 import com.daveanthonythomas.moshipack.MoshiPack
 
@@ -78,7 +75,7 @@ class MainActivity : AppCompatActivity() {
       Column(
         modifier = Modifier
           .fillMaxSize()
-          .background(if (isSystemInDarkTheme()) DarkColors.background else LightColors.background),
+          .background(MaterialTheme.colorScheme.background),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
       ) {
@@ -92,7 +89,7 @@ class MainActivity : AppCompatActivity() {
           Text(
             text = "MeshLink",
             style = MaterialTheme.typography.headlineLarge,
-            color = if (isSystemInDarkTheme()) DarkColors.onBackground else LightColors.onBackground,
+            color = MaterialTheme.colorScheme.onBackground,
           )
         }
       }
@@ -111,7 +108,7 @@ class MainActivity : AppCompatActivity() {
         modifier = Modifier
           .fillMaxSize()
           .background(
-            if (isSystemInDarkTheme()) DarkColors.background else LightColors.background,
+            MaterialTheme.colorScheme.background,
           )
       ) {
         val navController = rememberNavController()
@@ -162,7 +159,7 @@ class MainActivity : AppCompatActivity() {
                   text = databaseError,
                   modifier = Modifier.align(Alignment.Center),
                   style = MaterialTheme.typography.titleLarge,
-                  color = if (isSystemInDarkTheme()) DarkColors.onBackground else LightColors.onBackground,
+                  color = MaterialTheme.colorScheme.onBackground
                 )
               }
             }

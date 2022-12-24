@@ -1,8 +1,5 @@
 package com.cstef.meshlink.ui.components
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,8 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cstef.meshlink.db.entities.Device
-import com.cstef.meshlink.ui.theme.DarkColors
-import com.cstef.meshlink.ui.theme.LightColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,10 +27,8 @@ fun AvailableDevice(
     onClick = { onDeviceClick(device.userId) },
     shape = MaterialTheme.shapes.large,
     colors = CardDefaults.cardColors(
-      containerColor =
-      if (isSystemInDarkTheme()) DarkColors.primaryContainer else LightColors.primaryContainer,
-      contentColor =
-      if (isSystemInDarkTheme()) DarkColors.onPrimaryContainer else LightColors.onPrimaryContainer
+      containerColor = MaterialTheme.colorScheme.primaryContainer,
+      contentColor = MaterialTheme.colorScheme.onPrimaryContainer
     )
   ) {
     Row(
@@ -54,14 +47,12 @@ fun AvailableDevice(
         )
       }
       Column(
-        modifier = Modifier
-          .padding(24.dp),
-        horizontalAlignment = Alignment.End
+        modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.End
       ) {
         Icon(
           imageVector = Icons.Rounded.Add,
           contentDescription = "Add device",
-          tint = if (isSystemInDarkTheme()) DarkColors.onPrimaryContainer else LightColors.onPrimaryContainer
+          tint = MaterialTheme.colorScheme.onPrimaryContainer
         )
       }
 //        Icon(

@@ -1,10 +1,10 @@
 package com.cstef.meshlink.ui.theme
 
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 
 
@@ -77,40 +77,30 @@ fun AppTheme(
   useDarkTheme: Boolean = isSystemInDarkTheme(),
   content: @Composable () -> Unit
 ) {
-  val colors = if (!useDarkTheme) {
-    LightColors
-  } else {
-    DarkColors
+  val supportsDynamicColors = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+  val colors = when {
+    supportsDynamicColors && useDarkTheme -> dynamicDarkColorScheme(LocalContext.current)
+    supportsDynamicColors && !useDarkTheme -> dynamicLightColorScheme(LocalContext.current)
+    useDarkTheme -> DarkColors
+    else -> LightColors
   }
-  val systemUiController = rememberSystemUiController()
 
-  if (!useDarkTheme) {
-    systemUiController.setStatusBarColor(
-      color = md_theme_light_background,
-      darkIcons = true
-    )
-    systemUiController.setNavigationBarColor(
-      color = md_theme_light_background,
-      darkIcons = true
-    )
-    systemUiController.setSystemBarsColor(
-      color = md_theme_light_background,
-      darkIcons = true
-    )
-  } else {
-    systemUiController.setStatusBarColor(
-      color = md_theme_dark_background,
-      darkIcons = false
-    )
-    systemUiController.setNavigationBarColor(
-      color = md_theme_dark_background,
-      darkIcons = false
-    )
-    systemUiController.setSystemBarsColor(
-      color = md_theme_dark_background,
-      darkIcons = false
-    )
-  }
+  val systemUiController = rememberSystemUiController()
+  val darkIcons = !useDarkTheme
+
+  systemUiController.setStatusBarColor(
+    color = colors.background,
+    darkIcons = darkIcons
+  )
+  systemUiController.setNavigationBarColor(
+    color = colors.background,
+    darkIcons = darkIcons
+  )
+  systemUiController.setSystemBarsColor(
+    color = colors.background,
+    darkIcons = darkIcons
+  )
+
   MaterialTheme(
     colorScheme = colors,
     content = content

@@ -6,7 +6,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,8 +24,6 @@ import androidx.compose.ui.unit.dp
 import com.caverock.androidsvg.SVG
 import com.cstef.meshlink.BleService
 import com.cstef.meshlink.ui.components.ChatMessage
-import com.cstef.meshlink.ui.theme.DarkColors
-import com.cstef.meshlink.ui.theme.LightColors
 import com.cstef.meshlink.util.generateBeamSVG
 import com.cstef.meshlink.util.struct.Message
 
@@ -41,8 +38,7 @@ fun ChatScreen(
   val devices by bleBinder.allDevices.observeAsState(listOf())
   val device = devices.find { it.userId == deviceId }
   Column(
-    modifier = Modifier
-      .fillMaxSize()
+    modifier = Modifier.fillMaxSize()
   ) {
     if (deviceId != null) {
       TopAppBar(title = {
@@ -67,7 +63,7 @@ fun ChatScreen(
             Text(
               text = device?.name ?: deviceId,
               style = MaterialTheme.typography.titleLarge,
-              color = if (isSystemInDarkTheme()) DarkColors.onSurface else LightColors.onSurface
+              color = MaterialTheme.colorScheme.onSurface
             )
             if (device?.blocked == true) {
               Text(
@@ -78,7 +74,7 @@ fun ChatScreen(
                     Alignment.CenterHorizontally
                   ),
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (isSystemInDarkTheme()) DarkColors.error else LightColors.error
+                color = MaterialTheme.colorScheme.error
               )
             } else if (device?.connected == true) {
               Text(
@@ -89,7 +85,7 @@ fun ChatScreen(
                     Alignment.CenterHorizontally
                   ),
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (isSystemInDarkTheme()) DarkColors.onBackground else LightColors.onBackground
+                color = MaterialTheme.colorScheme.onBackground
               )
             } else {
               Text(
@@ -100,7 +96,7 @@ fun ChatScreen(
                     Alignment.CenterHorizontally
                   ),
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (isSystemInDarkTheme()) DarkColors.error else LightColors.error
+                color = MaterialTheme.colorScheme.error
               )
             }
           }
@@ -123,12 +119,7 @@ fun Avatar(
   modifier: Modifier = Modifier,
   onClick: (() -> Unit)? = null
 ) {
-  Canvas(
-    modifier = if (onClick != null) (
-      modifier
-        .clickable { onClick() }
-      ) else modifier
-  ) {
+  Canvas(modifier = if (onClick != null) (modifier.clickable { onClick() }) else modifier) {
     drawIntoCanvas { canvas ->
       val svgString = generateBeamSVG(
         deviceId,
@@ -184,15 +175,11 @@ fun Messages(
     }
   }
   LazyColumn(
-    modifier = modifier,
-    contentPadding = PaddingValues(
+    modifier = modifier, contentPadding = PaddingValues(
       horizontal = 16.dp, vertical = 8.dp
-    ),
-    state = scrollState
+    ), state = scrollState
   ) {
-    items(
-      messages.filter { it.senderId == deviceId || it.recipientId == deviceId }
-    ) { message ->
+    items(messages.filter { it.senderId == deviceId || it.recipientId == deviceId }) { message ->
       ChatMessage(
         type = message.type,
         content = message.content,

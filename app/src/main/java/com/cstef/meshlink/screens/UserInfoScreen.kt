@@ -2,7 +2,6 @@ package com.cstef.meshlink.screens
 
 import android.widget.Toast
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Done
@@ -18,9 +17,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.cstef.meshlink.BleService
 import com.cstef.meshlink.ui.components.DeviceID
-import com.cstef.meshlink.ui.theme.DarkColors
-import com.cstef.meshlink.ui.theme.LightColors
-import com.daveanthonythomas.moshipack.MoshiPack
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,8 +28,8 @@ fun UserInfoScreen(
   openSettings: () -> Unit,
 ) {
   val context = LocalContext.current
-  val colors = if (isSystemInDarkTheme()) DarkColors else LightColors
-  val devices by bleBinder.allDevices.observeAsState(listOf())
+  val colors = MaterialTheme.colorScheme
+  val devices by allDevices.observeAsState(listOf())
   val device = devices.find { it.userId == userId }
   // Display user info: Avatar, userID, public key, block/unblock button (if not me), delete data button (if me), rename text field (if not me)
   Column(modifier = Modifier.fillMaxSize()) {
