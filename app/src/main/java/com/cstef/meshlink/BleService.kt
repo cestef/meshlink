@@ -58,12 +58,12 @@ class BleService : Service() {
       bleManager.setUserId(id)
     }
 
-    fun sendMessage(receiverId: String, message: String, type: String = Message.Type.TEXT) {
+    fun sendMessage(recipientId: String, message: String, type: String = Message.Type.TEXT) {
       this@BleService.sendMessage(
         Message(
           UUID.randomUUID().toString(),
           userId,
-          receiverId,
+          recipientId,
           message,
           type,
           System.currentTimeMillis(),
@@ -289,11 +289,12 @@ class BleService : Service() {
           Log.d("BleService", "Message in cache")
           return
         }
-        if (message.recipientId == userId) {
+        if (message.recipientId == userId || message.recipientId == "broadcast") {
           //Log.d("BleService", "onDataReceived: $bleData")
           messagesHashes[message.senderId]?.add(hash)
           // Check if the user is blocked
-          message.content = encryptionManager.decrypt(message.content)
+          if (message.recipientId != "broadcast") message.content =
+            encryptionManager.decrypt(message.content)
 
           messageRepository?.insert(
             com.cstef.meshlink.db.entities.Message(
@@ -371,9 +372,10 @@ class BleService : Service() {
     override fun onUserRssiReceived(userId: String, rssi: Int) {
       val devices = allDevices?.value ?: return
       if (devices.isNotEmpty()) {
-        val device = devices[0]
-        if (device.rssi != rssi) {
-          deviceRepository?.update(device.copy(rssi = rssi))
+        devices.find { it.userId == userId }?.let { device ->
+          if (device.rssi != rssi) {
+            deviceRepository?.update(device.copy(rssi = rssi))
+          }
         }
       }
     }
@@ -436,7 +438,7 @@ class BleService : Service() {
   }
 
   fun sendMessage(message: Message) {
-    if (message.recipientId != null) {
+    if (message.recipientId != null && message.recipientId.isNotEmpty() && message.recipientId != "broadcast") {
       messageRepository?.insert(
         com.cstef.meshlink.db.entities.Message(
           message.id,
@@ -448,6 +450,18 @@ class BleService : Service() {
         )
       )
       bleManager.sendMessage(message)
+    } else if (message.recipientId == "broadcast") {
+      messageRepository?.insert(
+        com.cstef.meshlink.db.entities.Message(
+          message.id,
+          message.senderId,
+          message.recipientId,
+          message.content,
+          message.type,
+          message.timestamp
+        )
+      )
+      bleManager.broadcastMessage(message)
     }
   }
 

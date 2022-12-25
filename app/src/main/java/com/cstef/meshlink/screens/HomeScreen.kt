@@ -46,13 +46,13 @@ fun HomeScreen(
         )
       }
     }, modifier = Modifier.height(96.dp))
-    if ((devices?.any { it.added } == true)) {
+    if (devices.any { it.added }) {
       LazyColumn(
         modifier = Modifier
           .fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
       ) {
-        items(devices!!.filter { it.added }) { device ->
+        items(devices.filter { it.added }) { device ->
           AddedDevice(
             device = device,
             onDeviceLongClick = { onDeviceLongClick(device.userId) },

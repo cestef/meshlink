@@ -83,6 +83,14 @@ class BleManager(
     }
   }
 
+  fun broadcastMessage(message: Message) {
+    if (message.type == Message.Type.TEXT) {
+      clientManager.broadcastData(message)
+    } else {
+      Log.e(tag, "Cannot broadcast other than text messages")
+    }
+  }
+
   fun getUserIdForAddress(address: String): String? {
     Log.d(
       tag,

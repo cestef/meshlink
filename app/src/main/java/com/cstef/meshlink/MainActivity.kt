@@ -52,7 +52,10 @@ class MainActivity : AppCompatActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
-    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    // if debug mode is enabled, keep the screen on
+    if (BuildConfig.DEBUG) {
+      window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
     setContent {
       LoadingScreen()
     }
@@ -164,7 +167,18 @@ class MainActivity : AppCompatActivity() {
                     onDeviceLongClick = { navController.navigate("user/$it") },
                     onDeviceSelected = { navController.navigate("chat/$it") }
                   )
-                  // Manually add a device via its ID
+                  FloatingActionButton(
+                    onClick = { navController.navigate("broadcast") },
+                    modifier = Modifier
+                      .align(Alignment.BottomStart)
+                      .padding(24.dp)
+                  ) {
+                    Icon(
+                      imageVector = Icons.Rounded.Podcasts,
+                      contentDescription = "Broadcast",
+                      tint = MaterialTheme.colorScheme.onBackground
+                    )
+                  }
                   FloatingActionButton(
                     onClick = {
                       navController.navigate("add")
@@ -448,6 +462,45 @@ class MainActivity : AppCompatActivity() {
                 isDatabaseOpening = isDatabaseOpening,
                 openDatabase = { password ->
                   binder.openDatabase(password)
+                },
+              )
+            }
+          }
+          composable("broadcast",
+            enterTransition = {
+              slideInHorizontally(
+                initialOffsetX = { 1000 },
+                animationSpec = tween(300)
+              ) + fadeIn(animationSpec = tween(300))
+            },
+            exitTransition = {
+              slideOutHorizontally(
+                targetOffsetX = { -1000 },
+                animationSpec = tween(300)
+              ) + fadeOut(animationSpec = tween(300))
+            },
+            popEnterTransition = {
+              slideInHorizontally(
+                initialOffsetX = { -1000 },
+                animationSpec = tween(300)
+              ) + fadeIn(animationSpec = tween(300))
+            },
+            popExitTransition = {
+              slideOutHorizontally(
+                targetOffsetX = { 1000 },
+                animationSpec = tween(300)
+              ) + fadeOut(animationSpec = tween(300))
+            }
+          ) {
+            bleBinder?.let { binder ->
+              BroadcastScreen(
+                allMessages = binder.allMessages,
+                myId = userId,
+                sendMessage = { content, type ->
+                  binder.sendMessage("broadcast", content, type)
+                },
+                onUserClick = { userId ->
+                  navController.navigate("user/$userId")
                 },
               )
             }

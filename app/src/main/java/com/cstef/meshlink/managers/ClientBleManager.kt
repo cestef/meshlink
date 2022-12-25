@@ -75,10 +75,9 @@ class ClientBleManager(
     ScanFilter.Builder().setServiceUuid(ParcelUuid.fromString(BleUuid.SERVICE_UUID)).build()
       .let { listOf(it) }
 
-  private val scanSettings =
-    ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)
-      .setNumOfMatches(ScanSettings.MATCH_NUM_ONE_ADVERTISEMENT)
-      .setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE).build()
+  private val scanSettings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)
+    .setNumOfMatches(ScanSettings.MATCH_NUM_ONE_ADVERTISEMENT)
+    .setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE).build()
 
   private val scanCallback = object : ScanCallback() {
     @SuppressLint("MissingPermission")
@@ -316,28 +315,22 @@ class ClientBleManager(
             val speed = (chunkState.chunksSent * Chunk.CHUNK_SIZE / 1000.0) / (timeDiff / 1000.0)
             val df = DecimalFormat("#.##")
             df.roundingMode = RoundingMode.CEILING
-            builder
-              .setContentTitle("Sending data")
-              .setContentText(
-                "Average speed: ${
-                  df.format(speed).toDouble()
-                } kB/s"
+            builder.setContentTitle("Sending data").setContentText(
+              "Average speed: ${
+                df.format(speed).toDouble()
+              } kB/s"
+            ).setProgress(
+              chunkState.chunksTotal, chunkState.chunksSent, false
+            ).setOngoing(true).setSilent(true).addAction(
+              com.google.android.material.R.drawable.ic_m3_chip_close,
+              "Cancel",
+              PendingIntent.getBroadcast(
+                context,
+                0,
+                Intent("cancel_sending"),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
               )
-              .setProgress(
-                chunkState.chunksTotal, chunkState.chunksSent, false
-              )
-              .setOngoing(true)
-              .setSilent(true)
-              .addAction(
-                com.google.android.material.R.drawable.ic_m3_chip_close,
-                "Cancel",
-                PendingIntent.getBroadcast(
-                  context,
-                  0,
-                  Intent("cancel_sending"),
-                  PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-              )
+            )
             val notificationManager = NotificationManagerCompat.from(context)
             notificationManager.notify(chunkState.notificationId, builder.build())
           }
@@ -358,9 +351,12 @@ class ClientBleManager(
         val userId =
           connectedServersAddresses.entries.find { it.value == gatt?.device?.address }?.key
         if (userId != null) {
+          Log.d("ClientBleManager", "onReadRemoteRssi: userId = $userId")
           callbackHandler.post {
             dataExchangeManager.onUserRssiReceived(userId, rssi)
           }
+        } else {
+          Log.e("ClientBleManager", "onReadRemoteRssi: userId == null: ${gatt?.device?.address}")
         }
       } else {
         Log.e("ClientBleManager", "onReadRemoteRssi: failed to read rssi")
@@ -415,7 +411,7 @@ class ClientBleManager(
     // Log.d("ClientBleManager", "writeData: $data")
     val publicKeyForUser = message.recipientId?.let { dataExchangeManager.getPublicKeyForUser(it) }
     message.content =
-      if (message.recipientId != null && message.senderId == userId && publicKeyForUser != null) (encryptionManager.encrypt(
+      if (message.recipientId != null && message.senderId == userId && publicKeyForUser != null && message.recipientId != "broadcast") (encryptionManager.encrypt(
         message.content, publicKeyForUser
       ))
       else message.content
@@ -429,8 +425,7 @@ class ClientBleManager(
       val builder = NotificationCompat.Builder(context, "data")
         .setSmallIcon(R.drawable.ic_baseline_bluetooth_24).setContentTitle("Sending data")
         .setPriority(NotificationCompat.PRIORITY_DEFAULT).setSilent(true).setOngoing(true)
-        .setProgress(chunks.size, 0, false)
-        .addAction(
+        .setProgress(chunks.size, 0, false).addAction(
           com.google.android.material.R.drawable.ic_m3_chip_close,
           "Cancel",
           PendingIntent.getBroadcast(
@@ -489,7 +484,8 @@ class ClientBleManager(
         characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
         @Suppress("DEPRECATION")
         characteristic.value = chunk.toByteArray()
-        @Suppress("DEPRECATION") writeCharacteristic(characteristic)
+        @Suppress("DEPRECATION")
+        writeCharacteristic(characteristic)
       }
       Log.d("ClientBleManager", "writeData: chunk ${chunk.index + 1} written")
     } else {
@@ -557,7 +553,7 @@ class ClientBleManager(
   fun start() {
     startScanning()
     // Update remote rssi every 10 seconds
-    rssiUpdateJob = GlobalScope.launch(Dispatchers.IO) {
+    rssiUpdateJob = CoroutineScope(Dispatchers.Main).launch(Dispatchers.IO) {
       while (true) {
         delay(10000)
         connectedGattServers.values.forEach {

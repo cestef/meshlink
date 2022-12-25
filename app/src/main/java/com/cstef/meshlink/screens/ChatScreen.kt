@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.LiveData
 import com.caverock.androidsvg.SVG
@@ -123,7 +124,8 @@ fun ChatScreen(
 
 @Composable
 fun Avatar(
-  deviceId: String, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null
+  deviceId: String, modifier: Modifier = Modifier, size: Dp = 64.dp,
+  onClick: (() -> Unit)? = null,
 ) {
   Canvas(modifier = if (onClick != null) (modifier.clickable { onClick() }) else modifier) {
     drawIntoCanvas { canvas ->
@@ -158,7 +160,7 @@ fun Avatar(
           "#11111B"
         ),
         false,
-        RectF(0f, 0f, 64.dp.toPx(), 64.dp.toPx()),
+        RectF(0f, 0f, size.toPx(), size.toPx()),
       )
       val svg = SVG.getFromString(svgString)
       svg.renderToCanvas(canvas.nativeCanvas)
@@ -185,12 +187,15 @@ fun Messages(
       horizontal = 16.dp, vertical = 8.dp
     ), state = scrollState
   ) {
-    items(messages.filter { it.senderId == deviceId || it.recipientId == deviceId }) { message ->
+    items(messages.filter { (it.senderId == deviceId && it.recipientId != "broadcast") || it.recipientId == deviceId }) { message ->
       ChatMessage(
         type = message.type,
         content = message.content,
         timestamp = message.timestamp,
-        isMine = message.senderId != deviceId
+        isMine = message.senderId != deviceId,
+        showAvatar = false,
+        senderId = message.senderId,
+        onUserClick = { }
       )
     }
   }
@@ -198,7 +203,10 @@ fun Messages(
 
 @ExperimentalMaterial3Api
 @Composable
-fun SendMessage(sendMessage: (content: String, type: String) -> Unit) {
+fun SendMessage(
+  enableImages: Boolean = true,
+  sendMessage: (content: String, type: String) -> Unit
+) {
   val (text, setText) = remember { mutableStateOf("") }
   val context = LocalContext.current
   val galleryLauncher =
@@ -231,8 +239,10 @@ fun SendMessage(sendMessage: (content: String, type: String) -> Unit) {
         .align(Alignment.CenterVertically),
       shape = MaterialTheme.shapes.extraLarge,
       trailingIcon = {
-        IconButton(onClick = { galleryLauncher.launch("image/*") }) {
-          Icon(Icons.Filled.AttachFile, contentDescription = "Attach file")
+        if (enableImages) {
+          IconButton(onClick = { galleryLauncher.launch("image/*") }) {
+            Icon(Icons.Filled.AttachFile, contentDescription = "Attach file")
+          }
         }
       },
       singleLine = true,
