@@ -3,6 +3,8 @@ package com.cstef.meshlink.screens
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,6 +31,7 @@ fun UserInfoScreen(
   blockUser: () -> Unit,
   unblockUser: () -> Unit,
   deleteDataForUser: () -> Unit,
+  updateNickname: (String) -> Unit,
 ) {
   val context = LocalContext.current
   val colors = MaterialTheme.colorScheme
@@ -101,7 +104,19 @@ fun UserInfoScreen(
           modifier = Modifier
             .padding(top = 16.dp, bottom = 16.dp)
             .align(Alignment.CenterHorizontally),
-          singleLine = true
+          singleLine = true,
+          trailingIcon = {
+            if (newName.isNotEmpty()) {
+              IconButton(onClick = {
+                updateNickname(newName)
+              }) {
+                Icon(
+                  imageVector = Icons.Rounded.Check,
+                  contentDescription = "Save nickname",
+                )
+              }
+            }
+          }
         )
         val (chooseDeleteMode, setChooseDeleteMode) = remember { mutableStateOf(false) }
         if (chooseDeleteMode) {

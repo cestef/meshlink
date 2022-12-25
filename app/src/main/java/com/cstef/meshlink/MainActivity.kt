@@ -24,6 +24,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Podcasts
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -348,6 +349,9 @@ class MainActivity : AppCompatActivity() {
                 },
                 openSettings = {
                   navController.navigate("settings")
+                },
+                updateNickname = { nickname ->
+                  binder.updateDeviceName(otherUserId, nickname)
                 },
               )
             }
