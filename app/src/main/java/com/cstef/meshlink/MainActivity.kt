@@ -395,6 +395,9 @@ class MainActivity : AppCompatActivity() {
                 goToAbout = {
                   navController.navigate("about")
                 },
+                goToStats = {
+                  navController.navigate("stats")
+                },
                 deleteAllData = {
                   binder.deleteAllData()
                 },
@@ -508,6 +511,34 @@ class MainActivity : AppCompatActivity() {
                 },
               )
             }
+          }
+          composable("stats",
+            enterTransition = {
+              slideInHorizontally(
+                initialOffsetX = { 1000 },
+                animationSpec = tween(300)
+              ) + fadeIn(animationSpec = tween(300))
+            },
+            exitTransition = {
+              slideOutHorizontally(
+                targetOffsetX = { -1000 },
+                animationSpec = tween(300)
+              ) + fadeOut(animationSpec = tween(300))
+            },
+            popEnterTransition = {
+              slideInHorizontally(
+                initialOffsetX = { -1000 },
+                animationSpec = tween(300)
+              ) + fadeIn(animationSpec = tween(300))
+            },
+            popExitTransition = {
+              slideOutHorizontally(
+                targetOffsetX = { 1000 },
+                animationSpec = tween(300)
+              ) + fadeOut(animationSpec = tween(300))
+            }
+          ) {
+            StatsScreen()
           }
         }
         LaunchedEffect(databaseError) {

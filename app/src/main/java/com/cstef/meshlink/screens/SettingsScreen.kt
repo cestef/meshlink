@@ -18,6 +18,7 @@ fun SettingsScreen(
   startAdvertising: () -> Unit,
   stopAdvertising: () -> Unit,
   goToAbout: () -> Unit,
+  goToStats: () -> Unit,
   deleteAllData: () -> Unit,
   changeDatabasePassword: (password: String) -> Boolean,
 ) {
@@ -30,36 +31,36 @@ fun SettingsScreen(
       .height(56.dp)
       .padding(top = 16.dp),
   )
-  Column(
-    modifier = Modifier
-      .fillMaxSize()
-      .padding(top = 64.dp),
-    horizontalAlignment = Alignment.CenterHorizontally,
-    verticalArrangement = Arrangement.spacedBy(16.dp)
-  ) {
-    Row(
-      modifier = Modifier.fillMaxWidth(),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.SpaceBetween
+  Column {
+    Column(
+      modifier = Modifier
+        .padding(top = 64.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-      Text(
-        text = "Discoverable",
-        modifier = Modifier.padding(start = 16.dp),
-        color = colors.onBackground,
-        style = MaterialTheme.typography.bodyLarge
-      )
-      Switch(
-        checked = advertising,
-        onCheckedChange = {
-          if (it) {
-            startAdvertising()
-          } else {
-            stopAdvertising()
-          }
-        },
-        modifier = Modifier.padding(end = 16.dp)
-      )
-    }
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+      ) {
+        Text(
+          text = "Discoverable",
+          modifier = Modifier.padding(start = 16.dp),
+          color = colors.onBackground,
+          style = MaterialTheme.typography.bodyLarge
+        )
+        Switch(
+          checked = advertising,
+          onCheckedChange = {
+            if (it) {
+              startAdvertising()
+            } else {
+              stopAdvertising()
+            }
+          },
+          modifier = Modifier.padding(end = 16.dp)
+        )
+      }
 //    Row(
 //      modifier = Modifier.fillMaxWidth(),
 //      verticalAlignment = Alignment.CenterVertically,
@@ -83,136 +84,151 @@ fun SettingsScreen(
 //        modifier = Modifier.padding(end = 16.dp)
 //      )
 //    }
-    // Delete all data button
-    val (confirmDelete, setConfirmDelete) = remember { mutableStateOf(false) }
-    if (confirmDelete) {
-      AlertDialog(onDismissRequest = {
-        setConfirmDelete(false)
-      },
-        title = { Text("Delete data") },
-        text = { Text("Are you sure you want to delete all data?") },
-        confirmButton = {
-          Button(onClick = {
-            deleteAllData()
-            setConfirmDelete(false)
-          }) {
-            Text("Delete")
-          }
+      // Delete all data button
+      val (confirmDelete, setConfirmDelete) = remember { mutableStateOf(false) }
+      if (confirmDelete) {
+        AlertDialog(onDismissRequest = {
+          setConfirmDelete(false)
         },
-        dismissButton = {
-          TextButton(onClick = {
-            setConfirmDelete(false)
-          }) {
-            Text("Cancel")
-          }
-        })
-    }
-    Button(
-      onClick = {
-        setConfirmDelete(true)
-      }, modifier = Modifier
-        .padding(top = 16.dp)
-        .align(Alignment.CenterHorizontally)
-    ) {
-      Text("Delete all data")
-    }
+          title = { Text("Delete data") },
+          text = { Text("Are you sure you want to delete all data?") },
+          confirmButton = {
+            Button(onClick = {
+              deleteAllData()
+              setConfirmDelete(false)
+            }) {
+              Text("Delete")
+            }
+          },
+          dismissButton = {
+            TextButton(onClick = {
+              setConfirmDelete(false)
+            }) {
+              Text("Cancel")
+            }
+          })
+      }
+      Button(
+        onClick = {
+          setConfirmDelete(true)
+        }, modifier = Modifier
+          .padding(top = 16.dp)
+          .align(Alignment.CenterHorizontally)
+      ) {
+        Text("Delete all data")
+      }
 
-    // Change password
-    val (passwordDialogVisible, setPasswordDialogVisible) = remember { mutableStateOf(false) }
-    val (confirmDeletePassword, setConfirmDeletePassword) = remember { mutableStateOf(false) }
-    if (confirmDeletePassword) {
-      AlertDialog(onDismissRequest = {
-        setConfirmDeletePassword(false)
-      },
-        title = { Text("Delete password") },
-        text = { Text("Are you sure you want to delete the password?") },
-        confirmButton = {
-          Button(onClick = {
-            val success = changeDatabasePassword("")
-            if (success) {
+      // Change password
+      val (passwordDialogVisible, setPasswordDialogVisible) = remember { mutableStateOf(false) }
+      val (confirmDeletePassword, setConfirmDeletePassword) = remember { mutableStateOf(false) }
+      if (confirmDeletePassword) {
+        AlertDialog(onDismissRequest = {
+          setConfirmDeletePassword(false)
+        },
+          title = { Text("Delete password") },
+          text = { Text("Are you sure you want to delete the password?") },
+          confirmButton = {
+            Button(onClick = {
+              val success = changeDatabasePassword("")
+              if (success) {
+                setConfirmDeletePassword(false)
+              } else {
+                Toast.makeText(context, "Failed to delete password", Toast.LENGTH_SHORT).show()
+              }
+            }) {
+              Text("Delete")
+            }
+          },
+          dismissButton = {
+            TextButton(onClick = {
               setConfirmDeletePassword(false)
+            }) {
+              Text("Cancel")
+            }
+          })
+      }
+      if (passwordDialogVisible) {
+        val (newPassword, setNewPassword) = remember { mutableStateOf("") }
+        AlertDialog(onDismissRequest = {
+          setPasswordDialogVisible(false)
+        }, title = { Text("Enter password") }, text = {
+          Column {
+            OutlinedTextField(value = newPassword,
+              onValueChange = {
+                setNewPassword(it)
+              },
+              label = { Text("New password") },
+              modifier = Modifier
+                .padding(top = 16.dp, bottom = 16.dp)
+                .align(Alignment.CenterHorizontally),
+              singleLine = true,
+              trailingIcon = {
+                IconButton(onClick = {
+                  setNewPassword("")
+                }) {
+                  Icon(
+                    imageVector = Icons.Default.Clear, contentDescription = "Clear"
+                  )
+                }
+              })
+          }
+        }, confirmButton = {
+          Button(onClick = {
+            if (newPassword.isEmpty()) {
+              // Confirm if the user wants to remove the password
+              setPasswordDialogVisible(false)
+              setConfirmDeletePassword(true)
             } else {
-              Toast.makeText(context, "Failed to delete password", Toast.LENGTH_SHORT).show()
+              val success = changeDatabasePassword(newPassword)
+              if (success) {
+                setPasswordDialogVisible(false)
+              } else {
+                Toast.makeText(context, "Wrong password", Toast.LENGTH_SHORT).show()
+              }
             }
           }) {
-            Text("Delete")
+            Text("Set")
           }
-        },
-        dismissButton = {
+        }, dismissButton = {
           TextButton(onClick = {
-            setConfirmDeletePassword(false)
+            setPasswordDialogVisible(false)
           }) {
             Text("Cancel")
           }
         })
+      }
+      Button(
+        onClick = {
+          setPasswordDialogVisible(true)
+        },
+        modifier = Modifier
+          .padding(start = 16.dp, end = 16.dp)
+          .align(Alignment.CenterHorizontally),
+      ) {
+        Text(text = "Change password")
+      }
     }
-    if (passwordDialogVisible) {
-      val (newPassword, setNewPassword) = remember { mutableStateOf("") }
-      AlertDialog(onDismissRequest = {
-        setPasswordDialogVisible(false)
-      }, title = { Text("Enter password") }, text = {
-        Column {
-          OutlinedTextField(value = newPassword,
-            onValueChange = {
-              setNewPassword(it)
-            },
-            label = { Text("New password") },
-            modifier = Modifier
-              .padding(top = 16.dp, bottom = 16.dp)
-              .align(Alignment.CenterHorizontally),
-            singleLine = true,
-            trailingIcon = {
-              IconButton(onClick = {
-                setNewPassword("")
-              }) {
-                Icon(
-                  imageVector = Icons.Default.Clear, contentDescription = "Clear"
-                )
-              }
-            })
-        }
-      }, confirmButton = {
-        Button(onClick = {
-          if (newPassword.isEmpty()) {
-            // Confirm if the user wants to remove the password
-            setPasswordDialogVisible(false)
-            setConfirmDeletePassword(true)
-          } else {
-            val success = changeDatabasePassword(newPassword)
-            if (success) {
-              setPasswordDialogVisible(false)
-            } else {
-              Toast.makeText(context, "Wrong password", Toast.LENGTH_SHORT).show()
-            }
-          }
-        }) {
-          Text("Set")
-        }
-      }, dismissButton = {
-        TextButton(onClick = {
-          setPasswordDialogVisible(false)
-        }) {
-          Text("Cancel")
-        }
-      })
-    }
-    Button(
-      onClick = {
-        setPasswordDialogVisible(true)
-      },
-      modifier = Modifier
-        .padding(start = 16.dp, end = 16.dp)
-        .align(Alignment.CenterHorizontally),
+    Column(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-      Text(text = "Change password")
+      TextButton(
+        onClick = { goToStats() }, modifier = Modifier
+          .padding(start = 16.dp, end = 16.dp, top = 16.dp)
+          .align(
+            Alignment.CenterHorizontally
+          )
+      ) { Text(text = "Stats / Metrics") }
+      // About button
+      TextButton(
+        onClick = { goToAbout() },
+        modifier = Modifier
+          .padding(start = 16.dp, end = 16.dp)
+          .align(
+            Alignment.CenterHorizontally
+          ),
+      ) { Text(text = "About") }
     }
-    // About button
-    TextButton(
-      onClick = { goToAbout() }, modifier = Modifier
-        .padding(start = 16.dp, end = 16.dp)
-        .align(
-          Alignment.CenterHorizontally
-        )
-    ) { Text(text = "About") }
   }
 }
