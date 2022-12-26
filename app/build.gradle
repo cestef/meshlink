@@ -20,7 +20,7 @@ android {
 
   defaultConfig {
     applicationId "com.cstef.meshlink"
-    minSdk 23
+    minSdk 26
     targetSdk 33
     versionCode 28
     versionName "1.2.1"

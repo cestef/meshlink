@@ -57,11 +57,11 @@ fun UserInfoScreen(
       )
       if (device?.name != null) {
         Text(
-          text = userId,
+          text = device.name,
           style = MaterialTheme.typography.bodyLarge,
           modifier = Modifier
             .padding(bottom = 16.dp)
-            .weight(1f),
+            .align(Alignment.CenterHorizontally),
           color = colors.onBackground
         )
       }

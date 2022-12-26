@@ -7,10 +7,10 @@ import kotlin.experimental.or
 // The remaining bytes of each chunk are used to store the actual data.
 // The size of the resulting chunk's metadata is 2 bytes.
 
-// if the MTU is 512 bytes, the Bluetooth header is 4 bytes, and the chunk metadata is 2 bytes,
-// The maximum size of the data is 512-4-2=506 bytes.
+// if the MTU is 512 bytes, the Bluetooth header is 4 bytes, and the chunk metadata is 6 bytes,
+// The maximum size of the data is 512-4-6=502 bytes.
 // The maximum number of chunks is 2^15 = 32768
-// The maximum size of the data is 32768 * 506 = 16'580'608 bytes = 16.5 MB
+// The maximum size of the data is 32768 * 502 = 16'580'608 bytes = 16.5 MB
 // A transfer of 16.5 MB with an average speed of 23 chunks per second would take 16.5 MB / (23 * 506) = ~8 minutes
 class Chunk(val isLast: Boolean, val index: Short, val data: ByteArray, val messageId: Int) {
   fun toByteArray(): ByteArray {

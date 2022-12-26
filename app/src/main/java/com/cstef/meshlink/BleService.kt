@@ -2,6 +2,7 @@ package com.cstef.meshlink
 
 import android.app.NotificationManager
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.os.Binder
 import android.os.Handler
@@ -204,6 +205,9 @@ class BleService : Service() {
       Log.d("BleService", "onUserConnected: $userId")
       val devices = allDevices?.value ?: emptyList()
       if (!devices.any { it.userId == userId }) {
+        val sharedPreferences = getSharedPreferences("USER_STATS", MODE_PRIVATE)
+        val totalConnections = sharedPreferences.getInt("TOTAL_CONNECTIONS", 0)
+        sharedPreferences.edit().putInt("TOTAL_CONNECTIONS", totalConnections + 1).apply()
         deviceRepository?.insert(
           Device(
             userId = userId,
@@ -238,6 +242,9 @@ class BleService : Service() {
     }
 
     override fun onMessageSent(userId: String) {
+      val sharedPreferences = getSharedPreferences("USER_STATS", MODE_PRIVATE)
+      val sentMessages = sharedPreferences.getInt("TOTAL_MESSAGES_DELIVERED", 0)
+      sharedPreferences.edit().putInt("TOTAL_MESSAGES_DELIVERED", sentMessages + 1).apply()
       Log.d("BleService", "onMessageSent: $userId")
     }
 
@@ -290,6 +297,9 @@ class BleService : Service() {
           return
         }
         if (message.recipientId == userId || message.recipientId == "broadcast") {
+          val sharedPreferences = getSharedPreferences("USER_STATS", MODE_PRIVATE)
+          val receivedMessages = sharedPreferences.getInt("TOTAL_MESSAGES_RECEIVED", 0)
+          sharedPreferences.edit().putInt("TOTAL_MESSAGES_RECEIVED", receivedMessages + 1).apply()
           //Log.d("BleService", "onDataReceived: $bleData")
           messagesHashes[message.senderId]?.add(hash)
           // Check if the user is blocked
@@ -345,6 +355,9 @@ class BleService : Service() {
 
     override fun onMessageSendFailed(userId: String?, reason: String?) {
       Log.d("BleService", "onMessageSendFailed: $userId")
+      val sharedPreferences = getSharedPreferences("USER_STATS", Context.MODE_PRIVATE)
+      val failedMessages = sharedPreferences.getInt("TOTAL_MESSAGES_FAILED", 0)
+      sharedPreferences.edit().putInt("TOTAL_MESSAGES_FAILED", failedMessages + 1).apply()
       Toast.makeText(application, "Message to $userId failed: $reason", Toast.LENGTH_LONG).show()
     }
 
@@ -438,6 +451,9 @@ class BleService : Service() {
   }
 
   fun sendMessage(message: Message) {
+    val sharedPreferences = getSharedPreferences("USER_STATS", Context.MODE_PRIVATE)
+    val sentMessages = sharedPreferences.getInt("TOTAL_MESSAGES_SENT", 0)
+    sharedPreferences.edit().putInt("TOTAL_MESSAGES_SENT", sentMessages + 1).apply()
     if (message.recipientId != null && message.recipientId.isNotEmpty() && message.recipientId != "broadcast") {
       messageRepository?.insert(
         com.cstef.meshlink.db.entities.Message(

@@ -5,31 +5,24 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
 import java.util.*
+class OperationQueue(private val timeout: Long = 10000, private val handler: Handler = Handler(Looper.getMainLooper())) {
 
-/**
- * Execute operations in series. If an operation B is executed while operation A
- * is in progress. Operations B will not be executed until operation A is marked
- * as complete.
- * Runs operations on a separate thread.
- */
-class OperationQueue(timeout: Long = 10000, private val handler: Handler = Handler(Looper.getMainLooper())) {
+  private var currentOperation: Operation? = null
+  private val queue = ArrayDeque<Operation>()
 
-  private var currentOperation: (() -> Unit)? = null
-  private val queue = ArrayDeque<() -> Unit>()
-
-  fun execute(operation: () -> Unit) {
-    queue.add(operation)
+  fun execute(onTimeout: () -> Unit = {}, operation: () -> Unit) {
+    queue.add(Operation(operation, timeout, onTimeout))
     if (currentOperation == null) executeNext()
   }
 
   fun operationComplete() {
-    timeout.cancel()
+    timeoutTimer.cancel()
     currentOperation = null
     if (queue.isNotEmpty()) executeNext()
   }
 
   fun clear() {
-    timeout.cancel()
+    timeoutTimer.cancel()
     currentOperation = null
     queue.clear()
   }
@@ -37,14 +30,18 @@ class OperationQueue(timeout: Long = 10000, private val handler: Handler = Handl
   private fun executeNext() {
     currentOperation = queue.poll()
     handler.post {
-      timeout.start()
-      currentOperation?.invoke()
+      timeoutTimer.start()
+      currentOperation?.operation?.invoke()
     }
   }
 
-  private val timeout = object : CountDownTimer(timeout, 1000) {
-    override fun onFinish() = operationComplete()
-    override fun onTick(millisUntilFinished: Long) {
+  private val timeoutTimer = object : CountDownTimer(timeout, 1000) {
+    override fun onFinish() = run {
+      currentOperation?.onTimeout?.invoke()
+      operationComplete()
     }
+    override fun onTick(millisUntilFinished: Long) {}
   }
 }
+
+data class Operation(val operation: () -> Unit, val timeout: Long = 10000, val onTimeout: () -> Unit = {})
