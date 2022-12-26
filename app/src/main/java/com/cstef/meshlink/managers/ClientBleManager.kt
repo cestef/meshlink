@@ -421,48 +421,54 @@ class ClientBleManager(
     val chunks = value.chunked(Chunk.CHUNK_SIZE)
     Log.d("ClientBleManager", "writeData: chunks.size = ${chunks.size}")
     // Create a notification
-    if (chunks.size > 2) {
-      val builder = NotificationCompat.Builder(context, "data")
-        .setSmallIcon(R.drawable.ic_baseline_bluetooth_24).setContentTitle("Sending data")
-        .setPriority(NotificationCompat.PRIORITY_DEFAULT).setSilent(true).setOngoing(true)
-        .setProgress(chunks.size, 0, false).addAction(
-          com.google.android.material.R.drawable.ic_m3_chip_close,
-          "Cancel",
-          PendingIntent.getBroadcast(
-            context,
-            0,
-            Intent("cancel_sending"),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-          )
+    val builder = NotificationCompat.Builder(context, "data")
+      .setSmallIcon(R.drawable.ic_baseline_bluetooth_24).setContentTitle("Sending data")
+      .setPriority(NotificationCompat.PRIORITY_DEFAULT).setSilent(true).setOngoing(true)
+      .setProgress(chunks.size, 0, false).addAction(
+        com.google.android.material.R.drawable.ic_m3_chip_close,
+        "Cancel",
+        PendingIntent.getBroadcast(
+          context,
+          0,
+          Intent("cancel_sending"),
+          PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-      val notificationManager = NotificationManagerCompat.from(context)
-      val notificationId = message.id.toByteArray().sum().absoluteValue
-      notificationManager.notify(
-        notificationId, builder.build()
       )
-      val receiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-          Log.d("ClientBleManager", "onReceive: cancel_sending")
-          chunksOperationQueue.clear()
-          sendingChunks.remove(device.address)
-          notificationManager.cancel(notificationId)
-          context?.unregisterReceiver(this)
-          dataExchangeManager.onMessageSendFailed(message.recipientId, "Cancelled by user")
-        }
+    val notificationManager = NotificationManagerCompat.from(context)
+    val notificationId = message.id.toByteArray().sum().absoluteValue
+    notificationManager.notify(
+      notificationId, builder.build()
+    )
+    val receiver = object : BroadcastReceiver() {
+      override fun onReceive(context: Context?, intent: Intent?) {
+        Log.d("ClientBleManager", "onReceive: cancel_sending")
+        chunksOperationQueue.clear()
+        sendingChunks.remove(device.address)
+        notificationManager.cancel(notificationId)
+        context?.unregisterReceiver(this)
+        dataExchangeManager.onMessageSendFailed(message.recipientId, "Cancelled by user")
       }
-      sendingChunks[device.address] = ChunkSendingState(
-        0,
-        chunks.size,
-        message.recipientId ?: "",
-        notificationId,
-        System.currentTimeMillis(),
-        receiver
-      )
-      context.registerReceiver(receiver, IntentFilter("cancel_sending"))
     }
+    sendingChunks[device.address] = ChunkSendingState(
+      chunksSent = 0,
+      chunksTotal = chunks.size,
+      userId = message.recipientId ?: "",
+      notificationId = notificationId,
+      startTime = System.currentTimeMillis(),
+      receiver = receiver
+    )
+    context.registerReceiver(receiver, IntentFilter("cancel_sending"))
     chunks.forEachIndexed { index, chunk ->
       val chunkValue = Chunk(index == chunks.size - 1, index.toShort(), chunk, value.hashCode())
-      chunksOperationQueue.execute {
+      chunksOperationQueue.execute(onTimeout = {
+        Log.e(
+          "ClientBleManager",
+          "writeData: timeout (to ${message.recipientId})"
+        )
+        dataExchangeManager.onMessageSendFailed(message.recipientId, "Timeout")
+        sendingChunks.remove(device.address)
+        disconnect()
+      }) {
         sendChunk(chunkValue)
       }
     }

@@ -5,6 +5,7 @@ import android.bluetooth.*
 import android.bluetooth.le.*
 import android.content.Context
 import android.os.Handler
+import android.os.Parcel
 import android.os.ParcelUuid
 import android.util.Base64
 import android.util.Log
@@ -217,28 +218,20 @@ class ServerBleManager(
   fun startAdvertising() {
     if (adapter.isBleOn) {
       val userIdBytes = userId?.toByteArray(Charsets.UTF_8) ?: byteArrayOf()
-      Log.d(
-        "ServerBleManager",
-        "startAdvertising: userId size (bytes): ${userIdBytes.size}"
-      )
       val advertiseData =
         AdvertiseData.Builder()
           .addServiceUuid(ParcelUuid.fromString(BleUuid.SERVICE_UUID))
-//          .addServiceData(
-//            ParcelUuid.fromString(BleUuid.SERVICE_UUID),
-//            byteArrayOf()
-//          )
-//          .addManufacturerData(
-//            0x0000,
-//            userId?.toByteArray(Charsets.UTF_8)
-//          )
-//          .addServiceData(
-//            ParcelUuid.fromString(BleUuid.SERVICE_UUID),
-//            "test".toByteArray(Charsets.UTF_8)
-//          )
           .setIncludeDeviceName(false)
           .setIncludeTxPowerLevel(false)
           .build()
+      Log.d(
+        "ServerBleManager",
+        "startAdvertising: userId size (bytes): ${userIdBytes.size}, data size: ${
+          getAdvertisingDataSize(
+            advertiseData
+          )
+        }, max: ${adapter?.leMaximumAdvertisingDataLength}"
+      )
       advertiser?.startAdvertising(
         advertiseSettings, advertiseData, advertiseCallback
       )
@@ -258,5 +251,13 @@ class ServerBleManager(
 
   fun setUserId(id: String) {
     userId = id
+  }
+
+  fun getAdvertisingDataSize(data: AdvertiseData): Int {
+    val parcel = Parcel.obtain()
+    data.writeToParcel(parcel, 0)
+    val bytes = parcel.marshall()
+    parcel.recycle()
+    return bytes.size
   }
 }

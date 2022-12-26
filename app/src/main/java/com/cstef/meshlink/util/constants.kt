@@ -1327,7 +1327,6 @@ val nouns = listOf(
   "cobalt",
   "cobia",
   "cobweb",
-  "cock",
   "cocoa",
   "coconut",
   "cod",

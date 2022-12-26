@@ -69,8 +69,8 @@ fun AddedDevice(
       ) {
         Icon(
           imageVector =
-          if (device.rssi == 0) Icons.Rounded.SignalWifiBad
-          else if (!device.connected) Icons.Rounded.SignalWifiOff
+          if (!device.connected) Icons.Rounded.SignalWifiOff
+          else if (device.rssi == 0) Icons.Rounded.SignalWifiBad
           else if (device.rssi >= -60) Icons.Rounded.NetworkWifi
           else if (device.rssi >= -70) Icons.Rounded.NetworkWifi3Bar
           else if (device.rssi >= -80) Icons.Rounded.NetworkWifi2Bar
