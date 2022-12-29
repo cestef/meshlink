@@ -81,7 +81,7 @@ fun main() {
 
 ---
 
-# Kotlin
+## Kotlin
 
 * Développé par JetBrains
 * Similaire au Java
@@ -99,7 +99,7 @@ fun main() {
 
 ---
 
-# Bluetooth Low Energy 
+## Bluetooth Low Energy
 
 * Créé par Nokia en 2006
 * Basé sur le Bluetooth
@@ -120,7 +120,7 @@ fun main() {
 
 ---
 
-# SQLite
+## SQLite
 
 * Permet le stockage de données dans un fichier
 * Requêtes SQL
@@ -142,11 +142,14 @@ fun main() {
 
 ---
 
-# SQLCipher
+## SQLCipher
 
 * Chiffrement AES-256
 * Transparent pour l'utilisateur
 * Facile à intégrer
+
+![bg right 60%](../images/lock.png)
+
 
 ---
 
@@ -160,19 +163,22 @@ fun main() {
 
 - :lock: SQLCipher
 
-- :closed_lock_with_key: RSA-2048 + AES-256 
+- :closed_lock_with_key: RSA-2048 + AES-256
 
 ---
 
-# RSA-2048 + AES-256
+## RSA-2048 + AES-256
 
-* Chiffrement asymétrique (RSA)
-* Limite la taille des données à 256 octets (2048 bits)
-* Chiffrement symétrique (AES)
-* Pas de limite de taille (chiffrement par blocs)
+* Asymétrique (RSA)
+* Limite de données
+* Symétrique (AES)
+* Pas de limite de taille
+
+![bg right 60%](../images/lock_key.png)
+
 ---
 
-# Procédure de chiffrement
+## Procédure de chiffrement
 
 ### **Bob** envoie un message à **Alice**
 
@@ -183,7 +189,7 @@ fun main() {
 
 ---
 
-# Procédure de déchiffrement
+## Procédure de déchiffrement
 
 ### **Alice** reçoit un message de **Bob**
 
@@ -202,13 +208,13 @@ fun main() {
 
 - :lock: SQLCipher
 
-- :closed_lock_with_key: RSA-2048 + AES-256 
+- :closed_lock_with_key: RSA-2048 + AES-256
 
 - :package: MessagePack
 
 ---
 
-# MsgPack
+## MsgPack
 
 * Compact et rapide
 * Concurrence le JSON
@@ -225,27 +231,27 @@ fun main() {
 
 ---
 
-# Quantité de données par tranmission
+## Quantité de données par tranmission
 
 * :x: 512 octets (BLE) (-10 octets pour l'en-tête)
 * :white_check_mark: Séparation des messages en plusieurs morceaux
 
 ---
 
-# En-tête d'un morceau
+## En-tête d'un morceau
 
 ![](../images/diagrams/chunk-dark.png)
 
 ---
 
-# Quantité de données par tranmission
+## Quantité de données par tranmission
 
 - :x: 502 octets (BLE)
 - :white_check_mark: Séparation des messages en plusieurs morceaux
 
 ---
 
-# Séparation des messages
+## Séparation des messages
 
 $$
 \begin{aligned}
@@ -259,11 +265,12 @@ $$
 
 ---
 
-# Exemple
+## Exemple
 
-## **Elon** veut envoyer le script entier de Shrek à **Jeff**
-### _(54'350 octets)_
+### **Elon** veut envoyer le script entier de Shrek à **Jeff**
+#### _(54'350 octets)_
 ---
+
 
 $$
 \begin{aligned}
@@ -276,7 +283,7 @@ $$
 
 ---
 
-# <!--fit--> **Elon** doit donc envoyer 109 morceaux.
+# <!--fit--> **Elon** doit donc envoyer **109** morceaux.
 
 ---
 
@@ -284,14 +291,14 @@ $$
 
 ---
 
-# Identifiant d'utilisateur
+## Identifiant d'utilisateur
 
 * :x: `7092b805-e3b1-4a86-bc0a-df80ed89a9c4`
 * :white_check_mark: `awesome-unicorn-420`
 
 ---
 
-# Il fallait qu'il soit...
+## Il fallait qu'il soit...
 
 * :brain: Facile à retenir
 * :keyboard: Facile à taper
@@ -299,7 +306,7 @@ $$
 
 ---
 
-# Format d'un identifiant
+## Format d'un identifiant
 
 ### **1 adjectif** + **1 nom** + **3 chiffres**
 
@@ -309,7 +316,7 @@ $$
 
 ---
 
-# Probabilité de collision
+## Probabilité de collision
 
 $$
 \begin{aligned}
@@ -326,6 +333,10 @@ $$
 
 ---
 
+# Amélioration du Developer Experience (DX)
+
+---
+
 # Évaluation
 
 * 3 scénarios
@@ -334,11 +345,13 @@ $$
 
 ---
 
-# Scénario 1
+## Scénario 1
 
-## **Alice** envoie un message à **Bob**
+### **Alice** envoie un message à **Bob**
 
 #### (one-to-one)
+
+![bg right 75%](../images/diagrams/alice-bob.png)
 
 ---
 
@@ -346,11 +359,13 @@ $$
 
 ---
 
-# Scénario 2
+## Scénario 2
 
-## **Alice** envoie un message à **Bob** et **Charlie**
+### **Alice** envoie un message à **Bob** et **Charlie**
 
 #### (one-to-many, broadcast)
+
+![bg right 75%](../images/diagrams/alice-bob+charlie.png)
 
 ---
 
@@ -358,11 +373,13 @@ $$
 
 ---
 
-# Scénario 3
+## Scénario 3
 
-## **Alice** envoie un message à **Bob**, en passant par **Charlie**
+### **Alice** envoie un message à **Bob**, en passant par **Charlie**
 
 #### (one-to-one, relayed)
+
+![bg right 90%](../images/diagrams/alice-bob-charlie.png)
 
 ---
 
@@ -371,6 +388,7 @@ $$
 ---
 
 # Conclusion
+
 
 
 ---
