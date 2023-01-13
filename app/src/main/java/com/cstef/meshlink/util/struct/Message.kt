@@ -12,6 +12,7 @@ data class Message(
 ) : java.io.Serializable {
   class Type {
     companion object {
+      const val BENCHMARK = "benchmark"
       const val TEXT = "text"
       const val IMAGE = "image"
       // const val FILE = "file"

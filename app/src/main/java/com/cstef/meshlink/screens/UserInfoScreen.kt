@@ -1,5 +1,6 @@
 package com.cstef.meshlink.screens
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.LiveData
 import com.cstef.meshlink.db.entities.Device
 import com.cstef.meshlink.ui.components.DeviceID
+import kotlin.math.pow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,6 +60,19 @@ fun UserInfoScreen(
       if (device?.name != null) {
         Text(
           text = device.name,
+          style = MaterialTheme.typography.bodyLarge,
+          modifier = Modifier
+            .padding(bottom = 16.dp)
+            .align(Alignment.CenterHorizontally),
+          color = colors.onBackground
+        )
+      }
+      // Formula: Distance = 10 ^ ((Measured Power - RSSI)/(10 * N)) where N = 2 (in free space) and N = 3 (in walls), Measured Power = -50 (at 1 meter)
+      if (device?.connected == true && device.rssi != 0) {
+        Log.d("UserInfoScreen", "RSSI: ${device.rssi}, TX Power: ${device.txPower}")
+        val distance = 10.0.pow(((-59.0) - device.rssi.toDouble()) / (10.0 * 3.0))
+        Text(
+          text = "~%.2f meters away".format(distance),
           style = MaterialTheme.typography.bodyLarge,
           modifier = Modifier
             .padding(bottom = 16.dp)

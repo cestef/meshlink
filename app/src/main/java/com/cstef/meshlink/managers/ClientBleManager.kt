@@ -63,7 +63,8 @@ class ClientBleManager(
     val userId: String,
     val notificationId: Int,
     val startTime: Long = System.currentTimeMillis(),
-    val receiver: BroadcastReceiver
+    val receiver: BroadcastReceiver,
+    val messageId: String
   )
 
   private val sendingChunks = mutableMapOf<String, ChunkSendingState>()
@@ -72,10 +73,14 @@ class ClientBleManager(
   private val scanner get() = adapter?.bluetoothLeScanner
 
   private val scanFilters =
-    ScanFilter.Builder().setServiceUuid(ParcelUuid.fromString(BleUuid.SERVICE_UUID)).build()
+    ScanFilter.Builder()
+      .setServiceUuid(ParcelUuid.fromString(BleUuid.SERVICE_UUID))
+      // .setManufacturerData(0xDEAD, byteArrayOf(0x00))
+      .build()
       .let { listOf(it) }
 
-  private val scanSettings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)
+  private val scanSettings = ScanSettings.Builder()
+    .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
     .setNumOfMatches(ScanSettings.MATCH_NUM_ONE_ADVERTISEMENT)
     .setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE).build()
 
@@ -91,6 +96,18 @@ class ClientBleManager(
 //              Log.d("ClientBleManager", "onScanResult: $userId $rssi")
               if (userId != null) {
                 dataExchangeManager.onUserRssiReceived(userId, rssi)
+              }
+            }
+          }
+          result.txPower.let { txPower ->
+            if (txPower == ScanResult.TX_POWER_NOT_PRESENT) {
+              Log.d("ClientBleManager", "onScanResult: txPower not present")
+              return@execute
+            }
+            connectedServersAddresses.entries.find { it.value == device.address }?.key.let { userId ->
+//              Log.d("ClientBleManager", "onScanResult: $userId $txPower")
+              if (userId != null) {
+                dataExchangeManager.onUserTxPowerReceived(userId, txPower)
               }
             }
           }
@@ -180,6 +197,16 @@ class ClientBleManager(
             val serverId =
               connectedServersAddresses.entries.find { it.value == gatt.device.address }?.key
             connectedServersAddresses.remove(serverId)
+            if (sendingChunks.containsKey(gatt.device.address)) {
+              sendingChunks.remove(gatt.device.address)
+              val chunkSendingState = sendingChunks[gatt.device.address]
+              val notificationId = chunkSendingState?.notificationId ?: serverId.hashCode()
+              NotificationManagerCompat.from(context).cancel(notificationId)
+              dataExchangeManager.onMessageSendFailed(serverId, "Connection error")
+            }
+            if (serverId != null) {
+              dataExchangeManager.onUserDisconnected(serverId)
+            }
             gatt.close()
           }
         }
@@ -257,12 +284,14 @@ class ClientBleManager(
               .generatePublic(X509EncodedKeySpec(Base64.decode(msg.key, Base64.DEFAULT)))
             Log.d(
               "ClientBleManager",
-              "onCharacteristicRead: publicKey = $publicKey gatt == null: ${gatt == null}"
+              "onCharacteristicRead: publicKey = ${encryptionManager.getPublicKeySignature(publicKey)} gatt == null: ${gatt == null}"
             )
             if (gatt != null) {
               callbackHandler.post {
                 dataExchangeManager.onUserConnected(
-                  msg.userId, gatt.device.address, publicKey
+                  userId = msg.userId,
+                  address = gatt.device.address,
+                  publicKey = publicKey
                 )
               }
             } else {
@@ -308,7 +337,7 @@ class ClientBleManager(
             notificationManager.cancel(chunkState.notificationId)
             sendingChunks.remove(gatt?.device?.address)
             callbackHandler.post {
-              dataExchangeManager.onMessageSent(chunkState.userId)
+              dataExchangeManager.onMessageSent(chunkState.userId, chunkState.messageId)
             }
           } else {
             val timeDiff = System.currentTimeMillis() - chunkState.startTime
@@ -357,6 +386,7 @@ class ClientBleManager(
           }
         } else {
           Log.e("ClientBleManager", "onReadRemoteRssi: userId == null: ${gatt?.device?.address}")
+          gatt?.disconnect()
         }
       } else {
         Log.e("ClientBleManager", "onReadRemoteRssi: failed to read rssi")
@@ -455,7 +485,8 @@ class ClientBleManager(
       userId = message.recipientId ?: "",
       notificationId = notificationId,
       startTime = System.currentTimeMillis(),
-      receiver = receiver
+      receiver = receiver,
+      messageId = message.id
     )
     context.registerReceiver(receiver, IntentFilter("cancel_sending"))
     chunks.forEachIndexed { index, chunk ->

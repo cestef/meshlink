@@ -4,6 +4,7 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Feed
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,6 +20,8 @@ fun SettingsScreen(
   stopAdvertising: () -> Unit,
   goToAbout: () -> Unit,
   goToStats: () -> Unit,
+  goToLogs: () -> Unit,
+  goToBenchmark: () -> Unit,
   deleteAllData: () -> Unit,
   changeDatabasePassword: (password: String) -> Boolean,
 ) {
@@ -30,6 +33,30 @@ fun SettingsScreen(
     modifier = Modifier
       .height(56.dp)
       .padding(top = 16.dp),
+    actions = {
+      Row(
+        modifier = Modifier
+          .fillMaxHeight()
+          .padding(end = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.End
+      ) {
+        IconButton(onClick = goToLogs) {
+          Icon(
+            imageVector = Icons.Filled.Feed,
+            contentDescription = "Go to logs screen",
+            tint = colors.onSurface
+          )
+        }
+//        IconButton(onClick = goToBenchmark) {
+//          Icon(
+//            imageVector = Icons.Outlined.TrendingUp,
+//            contentDescription = "Go to benchmark screen",
+//            tint = colors.onSurface
+//          )
+//        }
+      }
+    }
   )
   Column {
     Column(

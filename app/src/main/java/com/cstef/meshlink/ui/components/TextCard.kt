@@ -32,6 +32,7 @@ fun TextCard(
       } else {
         MaterialTheme.colorScheme.secondary
       },
+      contentColor = MaterialTheme.colorScheme.onSecondary
     )
   ) {
     Row {
@@ -41,7 +42,10 @@ fun TextCard(
           .fillMaxWidth()
           .align(alignment = Alignment.CenterVertically)
       ) {
-        Text(text = content, style = MaterialTheme.typography.bodyLarge)
+        Text(
+          text = content,
+          style = MaterialTheme.typography.bodyLarge,
+        )
       }
     }
   }

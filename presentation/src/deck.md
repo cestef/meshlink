@@ -333,10 +333,6 @@ $$
 
 ---
 
-# Amélioration du Developer Experience (DX)
-
----
-
 # Évaluation
 
 * 3 scénarios
