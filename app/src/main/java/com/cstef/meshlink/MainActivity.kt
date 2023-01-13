@@ -123,51 +123,39 @@ class MainActivity : AppCompatActivity() {
           mutableStateOf(sharedPreferences.getBoolean("is_default_password", false))
         }
         AnimatedNavHost(navController = navController, startDestination = "home") {
-          composable(
-            "home",
-            enterTransition = {
-              if (!isDatabaseOpening) {
-                slideInHorizontally(
-                  initialOffsetX = { 1000 },
-                  animationSpec = tween(300)
-                ) + fadeIn(animationSpec = tween(300))
-              } else {
-                fadeIn(animationSpec = tween(300))
-              }
-            },
-            exitTransition = {
-              if (!isDatabaseOpening) {
-                slideOutHorizontally(
-                  targetOffsetX = { -1000 },
-                  animationSpec = tween(300)
-                ) + fadeOut(animationSpec = tween(300))
-              } else {
-                null
-              }
-            },
-            popEnterTransition = {
+          composable("home", enterTransition = {
+            if (!isDatabaseOpening) {
               slideInHorizontally(
-                initialOffsetX = { -1000 },
-                animationSpec = tween(300)
+                initialOffsetX = { 1000 }, animationSpec = tween(300)
               ) + fadeIn(animationSpec = tween(300))
-            },
-            popExitTransition = {
-              slideOutHorizontally(
-                targetOffsetX = { 1000 },
-                animationSpec = tween(300)
-              ) + fadeOut(animationSpec = tween(300))
+            } else {
+              fadeIn(animationSpec = tween(300))
             }
-          ) {
+          }, exitTransition = {
+            if (!isDatabaseOpening) {
+              slideOutHorizontally(
+                targetOffsetX = { -1000 }, animationSpec = tween(300)
+              ) + fadeOut(animationSpec = tween(300))
+            } else {
+              null
+            }
+          }, popEnterTransition = {
+            slideInHorizontally(
+              initialOffsetX = { -1000 }, animationSpec = tween(300)
+            ) + fadeIn(animationSpec = tween(300))
+          }, popExitTransition = {
+            slideOutHorizontally(
+              targetOffsetX = { 1000 }, animationSpec = tween(300)
+            ) + fadeOut(animationSpec = tween(300))
+          }) {
             if (isDatabaseOpen) {
               Box(modifier = Modifier.fillMaxSize()) {
                 bleBinder?.let { binder ->
-                  HomeScreen(
-                    allDevices = binder.allDevices,
+                  HomeScreen(allDevices = binder.allDevices,
                     userId = userId,
                     onSelfClick = { navController.navigate("user/$userId") },
                     onDeviceLongClick = { navController.navigate("user/$it") },
-                    onDeviceSelected = { navController.navigate("chat/$it") }
-                  )
+                    onDeviceSelected = { navController.navigate("chat/$it") })
                   FloatingActionButton(
                     onClick = { navController.navigate("broadcast") },
                     modifier = Modifier
@@ -183,8 +171,7 @@ class MainActivity : AppCompatActivity() {
                   FloatingActionButton(
                     onClick = {
                       navController.navigate("add")
-                    },
-                    modifier = Modifier
+                    }, modifier = Modifier
                       .align(Alignment.BottomEnd)
                       .padding(24.dp)
                   ) {
@@ -214,38 +201,31 @@ class MainActivity : AppCompatActivity() {
               }
             }
           }
-          composable(
-            "chat/{deviceId}",
+          composable("chat/{deviceId}",
             arguments = listOf(navArgument("deviceId") { type = NavType.StringType }),
             enterTransition = {
               slideInHorizontally(
-                initialOffsetX = { 1000 },
-                animationSpec = tween(300)
+                initialOffsetX = { 1000 }, animationSpec = tween(300)
               ) + fadeIn(animationSpec = tween(300))
             },
             exitTransition = {
               slideOutHorizontally(
-                targetOffsetX = { -1000 },
-                animationSpec = tween(300)
+                targetOffsetX = { -1000 }, animationSpec = tween(300)
               ) + fadeOut(animationSpec = tween(300))
             },
             popEnterTransition = {
               slideInHorizontally(
-                initialOffsetX = { -1000 },
-                animationSpec = tween(300)
+                initialOffsetX = { -1000 }, animationSpec = tween(300)
               ) + fadeIn(animationSpec = tween(300))
             },
             popExitTransition = {
               slideOutHorizontally(
-                targetOffsetX = { 1000 },
-                animationSpec = tween(300)
+                targetOffsetX = { 1000 }, animationSpec = tween(300)
               ) + fadeOut(animationSpec = tween(300))
-            }
-          ) { backStackEntry ->
+            }) { backStackEntry ->
             bleBinder?.let { binder ->
               val deviceId = backStackEntry.arguments?.getString("deviceId") ?: ""
-              ChatScreen(
-                deviceId = deviceId,
+              ChatScreen(deviceId = deviceId,
                 allMessages = binder.allMessages,
                 allDevices = binder.allDevices,
                 sendMessage = { content, type ->
@@ -256,77 +236,57 @@ class MainActivity : AppCompatActivity() {
                 })
             }
           }
-          composable(
-            "add",
-            enterTransition = {
-              slideInHorizontally(
-                initialOffsetX = { 1000 },
-                animationSpec = tween(300)
-              ) + fadeIn(animationSpec = tween(300))
-            },
-            exitTransition = {
-              slideOutHorizontally(
-                targetOffsetX = { -1000 },
-                animationSpec = tween(300)
-              ) + fadeOut(animationSpec = tween(300))
-            },
-            popEnterTransition = {
-              slideInHorizontally(
-                initialOffsetX = { -1000 },
-                animationSpec = tween(300)
-              ) + fadeIn(animationSpec = tween(300))
-            },
-            popExitTransition = {
-              slideOutHorizontally(
-                targetOffsetX = { 1000 },
-                animationSpec = tween(300)
-              ) + fadeOut(animationSpec = tween(300))
-            }
-          ) {
+          composable("add", enterTransition = {
+            slideInHorizontally(
+              initialOffsetX = { 1000 }, animationSpec = tween(300)
+            ) + fadeIn(animationSpec = tween(300))
+          }, exitTransition = {
+            slideOutHorizontally(
+              targetOffsetX = { -1000 }, animationSpec = tween(300)
+            ) + fadeOut(animationSpec = tween(300))
+          }, popEnterTransition = {
+            slideInHorizontally(
+              initialOffsetX = { -1000 }, animationSpec = tween(300)
+            ) + fadeIn(animationSpec = tween(300))
+          }, popExitTransition = {
+            slideOutHorizontally(
+              targetOffsetX = { 1000 }, animationSpec = tween(300)
+            ) + fadeOut(animationSpec = tween(300))
+          }) {
             bleBinder?.let { binder ->
-              AddDeviceScreen(
-                allDevices = binder.allDevices,
-                addDevice = { id ->
-                  binder.addDevice(id)
-                },
-                onBack = { user ->
-                  if (user != null) {
-                    navController.navigate("user/${user}")
-                  } else {
-                    navController.popBackStack()
-                  }
+              AddDeviceScreen(allDevices = binder.allDevices, addDevice = { id ->
+                binder.addDevice(id)
+              }, onBack = { user ->
+                if (user != null) {
+                  navController.navigate("user/${user}")
+                } else {
+                  navController.popBackStack()
                 }
-              )
+              })
             }
           }
-          composable(
-            "user/{deviceId}",
+          composable("user/{deviceId}",
             arguments = listOf(navArgument("deviceId") { type = NavType.StringType }),
             enterTransition = {
               slideInHorizontally(
-                initialOffsetX = { 1000 },
-                animationSpec = tween(300)
+                initialOffsetX = { 1000 }, animationSpec = tween(300)
               ) + fadeIn(animationSpec = tween(300))
             },
             exitTransition = {
               slideOutHorizontally(
-                targetOffsetX = { -1000 },
-                animationSpec = tween(300)
+                targetOffsetX = { -1000 }, animationSpec = tween(300)
               ) + fadeOut(animationSpec = tween(300))
             },
             popEnterTransition = {
               slideInHorizontally(
-                initialOffsetX = { -1000 },
-                animationSpec = tween(300)
+                initialOffsetX = { -1000 }, animationSpec = tween(300)
               ) + fadeIn(animationSpec = tween(300))
             },
             popExitTransition = {
               slideOutHorizontally(
-                targetOffsetX = { 1000 },
-                animationSpec = tween(300)
+                targetOffsetX = { 1000 }, animationSpec = tween(300)
               ) + fadeOut(animationSpec = tween(300))
-            }
-          ) { backStackEntry ->
+            }) { backStackEntry ->
             // User info screen
             val otherUserId = backStackEntry.arguments?.getString("deviceId") ?: ""
             bleBinder?.let { binder ->
@@ -356,33 +316,23 @@ class MainActivity : AppCompatActivity() {
               )
             }
           }
-          composable(
-            "settings",
-            enterTransition = {
-              slideInHorizontally(
-                initialOffsetX = { 1000 },
-                animationSpec = tween(300)
-              ) + fadeIn(animationSpec = tween(300))
-            },
-            exitTransition = {
-              slideOutHorizontally(
-                targetOffsetX = { -1000 },
-                animationSpec = tween(300)
-              ) + fadeOut(animationSpec = tween(300))
-            },
-            popEnterTransition = {
-              slideInHorizontally(
-                initialOffsetX = { -1000 },
-                animationSpec = tween(300)
-              ) + fadeIn(animationSpec = tween(300))
-            },
-            popExitTransition = {
-              slideOutHorizontally(
-                targetOffsetX = { 1000 },
-                animationSpec = tween(300)
-              ) + fadeOut(animationSpec = tween(300))
-            }
-          ) {
+          composable("settings", enterTransition = {
+            slideInHorizontally(
+              initialOffsetX = { 1000 }, animationSpec = tween(300)
+            ) + fadeIn(animationSpec = tween(300))
+          }, exitTransition = {
+            slideOutHorizontally(
+              targetOffsetX = { -1000 }, animationSpec = tween(300)
+            ) + fadeOut(animationSpec = tween(300))
+          }, popEnterTransition = {
+            slideInHorizontally(
+              initialOffsetX = { -1000 }, animationSpec = tween(300)
+            ) + fadeIn(animationSpec = tween(300))
+          }, popExitTransition = {
+            slideOutHorizontally(
+              targetOffsetX = { 1000 }, animationSpec = tween(300)
+            ) + fadeOut(animationSpec = tween(300))
+          }) {
             bleBinder?.let { binder ->
               SettingsScreen(
                 isAdvertising = binder.isAdvertising,
@@ -398,6 +348,12 @@ class MainActivity : AppCompatActivity() {
                 goToStats = {
                   navController.navigate("stats")
                 },
+                goToLogs = {
+                  navController.navigate("logs")
+                },
+                goToBenchmark = {
+                  navController.navigate("benchmark")
+                },
                 deleteAllData = {
                   binder.deleteAllData()
                 },
@@ -407,62 +363,42 @@ class MainActivity : AppCompatActivity() {
               )
             }
           }
-          composable(
-            "about",
-            enterTransition = {
-              slideInHorizontally(
-                initialOffsetX = { 1000 },
-                animationSpec = tween(300)
-              ) + fadeIn(animationSpec = tween(300))
-            },
-            exitTransition = {
-              slideOutHorizontally(
-                targetOffsetX = { -1000 },
-                animationSpec = tween(300)
-              ) + fadeOut(animationSpec = tween(300))
-            },
-            popEnterTransition = {
-              slideInHorizontally(
-                initialOffsetX = { -1000 },
-                animationSpec = tween(300)
-              ) + fadeIn(animationSpec = tween(300))
-            },
-            popExitTransition = {
-              slideOutHorizontally(
-                targetOffsetX = { 1000 },
-                animationSpec = tween(300)
-              ) + fadeOut(animationSpec = tween(300))
-            }
-          ) {
+          composable("about", enterTransition = {
+            slideInHorizontally(
+              initialOffsetX = { 1000 }, animationSpec = tween(300)
+            ) + fadeIn(animationSpec = tween(300))
+          }, exitTransition = {
+            slideOutHorizontally(
+              targetOffsetX = { -1000 }, animationSpec = tween(300)
+            ) + fadeOut(animationSpec = tween(300))
+          }, popEnterTransition = {
+            slideInHorizontally(
+              initialOffsetX = { -1000 }, animationSpec = tween(300)
+            ) + fadeIn(animationSpec = tween(300))
+          }, popExitTransition = {
+            slideOutHorizontally(
+              targetOffsetX = { 1000 }, animationSpec = tween(300)
+            ) + fadeOut(animationSpec = tween(300))
+          }) {
             AboutScreen()
           }
-          composable(
-            "password",
-            enterTransition = {
-              slideInHorizontally(
-                initialOffsetX = { 1000 },
-                animationSpec = tween(300)
-              ) + fadeIn(animationSpec = tween(300))
-            },
-            exitTransition = {
-              slideOutHorizontally(
-                targetOffsetX = { -1000 },
-                animationSpec = tween(300)
-              ) + fadeOut(animationSpec = tween(300))
-            },
-            popEnterTransition = {
-              slideInHorizontally(
-                initialOffsetX = { -1000 },
-                animationSpec = tween(300)
-              ) + fadeIn(animationSpec = tween(300))
-            },
-            popExitTransition = {
-              slideOutHorizontally(
-                targetOffsetX = { 1000 },
-                animationSpec = tween(300)
-              ) + fadeOut(animationSpec = tween(300))
-            }
-          ) {
+          composable("password", enterTransition = {
+            slideInHorizontally(
+              initialOffsetX = { 1000 }, animationSpec = tween(300)
+            ) + fadeIn(animationSpec = tween(300))
+          }, exitTransition = {
+            slideOutHorizontally(
+              targetOffsetX = { -1000 }, animationSpec = tween(300)
+            ) + fadeOut(animationSpec = tween(300))
+          }, popEnterTransition = {
+            slideInHorizontally(
+              initialOffsetX = { -1000 }, animationSpec = tween(300)
+            ) + fadeIn(animationSpec = tween(300))
+          }, popExitTransition = {
+            slideOutHorizontally(
+              targetOffsetX = { 1000 }, animationSpec = tween(300)
+            ) + fadeOut(animationSpec = tween(300))
+          }) {
             bleBinder?.let { binder ->
               PasswordScreen(
                 firstTime = firstTime,
@@ -473,32 +409,23 @@ class MainActivity : AppCompatActivity() {
               )
             }
           }
-          composable("broadcast",
-            enterTransition = {
-              slideInHorizontally(
-                initialOffsetX = { 1000 },
-                animationSpec = tween(300)
-              ) + fadeIn(animationSpec = tween(300))
-            },
-            exitTransition = {
-              slideOutHorizontally(
-                targetOffsetX = { -1000 },
-                animationSpec = tween(300)
-              ) + fadeOut(animationSpec = tween(300))
-            },
-            popEnterTransition = {
-              slideInHorizontally(
-                initialOffsetX = { -1000 },
-                animationSpec = tween(300)
-              ) + fadeIn(animationSpec = tween(300))
-            },
-            popExitTransition = {
-              slideOutHorizontally(
-                targetOffsetX = { 1000 },
-                animationSpec = tween(300)
-              ) + fadeOut(animationSpec = tween(300))
-            }
-          ) {
+          composable("broadcast", enterTransition = {
+            slideInHorizontally(
+              initialOffsetX = { 1000 }, animationSpec = tween(300)
+            ) + fadeIn(animationSpec = tween(300))
+          }, exitTransition = {
+            slideOutHorizontally(
+              targetOffsetX = { -1000 }, animationSpec = tween(300)
+            ) + fadeOut(animationSpec = tween(300))
+          }, popEnterTransition = {
+            slideInHorizontally(
+              initialOffsetX = { -1000 }, animationSpec = tween(300)
+            ) + fadeIn(animationSpec = tween(300))
+          }, popExitTransition = {
+            slideOutHorizontally(
+              targetOffsetX = { 1000 }, animationSpec = tween(300)
+            ) + fadeOut(animationSpec = tween(300))
+          }) {
             bleBinder?.let { binder ->
               BroadcastScreen(
                 allMessages = binder.allMessages,
@@ -512,33 +439,72 @@ class MainActivity : AppCompatActivity() {
               )
             }
           }
-          composable("stats",
-            enterTransition = {
-              slideInHorizontally(
-                initialOffsetX = { 1000 },
-                animationSpec = tween(300)
-              ) + fadeIn(animationSpec = tween(300))
-            },
-            exitTransition = {
-              slideOutHorizontally(
-                targetOffsetX = { -1000 },
-                animationSpec = tween(300)
-              ) + fadeOut(animationSpec = tween(300))
-            },
-            popEnterTransition = {
-              slideInHorizontally(
-                initialOffsetX = { -1000 },
-                animationSpec = tween(300)
-              ) + fadeIn(animationSpec = tween(300))
-            },
-            popExitTransition = {
-              slideOutHorizontally(
-                targetOffsetX = { 1000 },
-                animationSpec = tween(300)
-              ) + fadeOut(animationSpec = tween(300))
-            }
-          ) {
+          composable("stats", enterTransition = {
+            slideInHorizontally(
+              initialOffsetX = { 1000 }, animationSpec = tween(300)
+            ) + fadeIn(animationSpec = tween(300))
+          }, exitTransition = {
+            slideOutHorizontally(
+              targetOffsetX = { -1000 }, animationSpec = tween(300)
+            ) + fadeOut(animationSpec = tween(300))
+          }, popEnterTransition = {
+            slideInHorizontally(
+              initialOffsetX = { -1000 }, animationSpec = tween(300)
+            ) + fadeIn(animationSpec = tween(300))
+          }, popExitTransition = {
+            slideOutHorizontally(
+              targetOffsetX = { 1000 }, animationSpec = tween(300)
+            ) + fadeOut(animationSpec = tween(300))
+          }) {
             StatsScreen()
+          }
+          composable("logs", enterTransition = {
+            slideInHorizontally(
+              initialOffsetX = { 1000 }, animationSpec = tween(300)
+            ) + fadeIn(animationSpec = tween(300))
+          }, exitTransition = {
+            slideOutHorizontally(
+              targetOffsetX = { -1000 }, animationSpec = tween(300)
+            ) + fadeOut(animationSpec = tween(300))
+          }, popEnterTransition = {
+            slideInHorizontally(
+              initialOffsetX = { -1000 }, animationSpec = tween(300)
+            ) + fadeIn(animationSpec = tween(300))
+          }, popExitTransition = {
+            slideOutHorizontally(
+              targetOffsetX = { 1000 }, animationSpec = tween(300)
+            ) + fadeOut(animationSpec = tween(300))
+          }) {
+            bleBinder?.let { binder ->
+              LogsScreen(
+                logcatLogs = binder.logcatLogs,
+              ) {
+                binder.service.logsManager.logcatMessages.value = emptyList()
+              }
+            }
+          }
+          composable("benchmark", enterTransition = {
+            slideInHorizontally(
+              initialOffsetX = { 1000 }, animationSpec = tween(300)
+            ) + fadeIn(animationSpec = tween(300))
+          }, exitTransition = {
+            slideOutHorizontally(
+              targetOffsetX = { -1000 }, animationSpec = tween(300)
+            ) + fadeOut(animationSpec = tween(300))
+          }, popEnterTransition = {
+            slideInHorizontally(
+              initialOffsetX = { -1000 }, animationSpec = tween(300)
+            ) + fadeIn(animationSpec = tween(300))
+          }, popExitTransition = {
+            slideOutHorizontally(
+              targetOffsetX = { 1000 }, animationSpec = tween(300)
+            ) + fadeOut(animationSpec = tween(300))
+          }) {
+            bleBinder?.let { binder ->
+              BenchmarkScreen(
+                binder = binder,
+              )
+            }
           }
         }
         LaunchedEffect(databaseError) {
@@ -562,40 +528,36 @@ class MainActivity : AppCompatActivity() {
               popUpTo("home") { inclusive = true }
             }
           }
-          RequestMultiplePermissions(
-            permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-              listOf(
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION,
-                Manifest.permission.BLUETOOTH,
-                Manifest.permission.BLUETOOTH_ADVERTISE,
-                Manifest.permission.BLUETOOTH_CONNECT,
-                Manifest.permission.BLUETOOTH_SCAN,
-              )
-            } else {
-              listOf(
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION,
-                Manifest.permission.BLUETOOTH,
-                Manifest.permission.BLUETOOTH_ADMIN,
-              )
-            },
-            content = {
-              LaunchedEffect(Unit) {
-                if (sharedPreferences.getBoolean("first_time", true)) {
-                  val editor = sharedPreferences.edit()
-                  editor.putBoolean("first_time", false)
-                  editor.apply()
-                }
-                if (!checkBluetoothEnabled()) {
-                  Toast.makeText(this@MainActivity, "Bluetooth is disabled", Toast.LENGTH_LONG)
-                    .show()
-                } else {
-                  start()
-                }
+          RequestMultiplePermissions(permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            listOf(
+              Manifest.permission.ACCESS_FINE_LOCATION,
+              Manifest.permission.ACCESS_COARSE_LOCATION,
+              Manifest.permission.BLUETOOTH,
+              Manifest.permission.BLUETOOTH_ADVERTISE,
+              Manifest.permission.BLUETOOTH_CONNECT,
+              Manifest.permission.BLUETOOTH_SCAN,
+            )
+          } else {
+            listOf(
+              Manifest.permission.ACCESS_FINE_LOCATION,
+              Manifest.permission.ACCESS_COARSE_LOCATION,
+              Manifest.permission.BLUETOOTH,
+              Manifest.permission.BLUETOOTH_ADMIN,
+            )
+          }, content = {
+            LaunchedEffect(Unit) {
+              if (sharedPreferences.getBoolean("first_time", true)) {
+                val editor = sharedPreferences.edit()
+                editor.putBoolean("first_time", false)
+                editor.apply()
+              }
+              if (!checkBluetoothEnabled()) {
+                Toast.makeText(this@MainActivity, "Bluetooth is disabled", Toast.LENGTH_LONG).show()
+              } else {
+                start()
               }
             }
-          )
+          })
         }
       }
     }

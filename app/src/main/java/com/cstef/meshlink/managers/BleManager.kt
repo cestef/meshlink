@@ -31,8 +31,6 @@ class BleManager(
 
   val isAdvertising = mutableStateOf(false)
   val isStarted = mutableStateOf(false)
-  val isScanning = mutableStateOf(false)
-  private val tag = BleManager::class.java.canonicalName
   private val adapter get() = (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
 
   // BLE Callbacks are executed on a binder thread. This handlers gets the work
@@ -61,7 +59,7 @@ class BleManager(
 
   @SuppressLint("MissingPermission")
   fun stop() {
-    Log.d(tag, "BleManager stopped")
+    Log.d("BleManager", "BleManager stopped")
     if (canBeClient) clientManager.stop()
     if (canBeServer) serverManager.stopAdvertising()
     isStarted.value = false
@@ -70,15 +68,15 @@ class BleManager(
   fun sendMessage(message: Message) {
     val deviceAddress = clientManager.connectedServersAddresses[message.recipientId]
     if (deviceAddress != null && clientManager.connectedGattServers.containsKey(deviceAddress)) {
-      Log.d(tag, clientManager.connectedGattServers[deviceAddress]?.device?.address!!)
-      Log.d(tag, "Sending data to ${message.recipientId}")
+      Log.d("BleManager", clientManager.connectedGattServers[deviceAddress]?.device?.address!!)
+      Log.d("BleManager", "Sending data to ${message.recipientId}")
       clientManager.sendData(message)
     } else {
-      Log.d(tag, "No connection to ${message.recipientId}, broadcasting data")
+      Log.d("BleManager", "No connection to ${message.recipientId}, broadcasting data")
       if (message.type == Message.Type.TEXT) {
         clientManager.broadcastData(message)
       } else {
-        Log.e(tag, "Cannot broadcast other than text messages")
+        Log.e("BleManager", "Cannot broadcast other than text messages")
       }
     }
   }
@@ -87,13 +85,13 @@ class BleManager(
     if (message.type == Message.Type.TEXT) {
       clientManager.broadcastData(message)
     } else {
-      Log.e(tag, "Cannot broadcast other than text messages")
+      Log.e("BleManager", "Cannot broadcast other than text messages")
     }
   }
 
   fun getUserIdForAddress(address: String): String? {
     Log.d(
-      tag,
+      "BleManager",
       "Getting user id for address $address, connected servers: ${clientManager.connectedServersAddresses}"
     )
     return clientManager.connectedServersAddresses.entries.find { it.value == address }?.key
@@ -174,7 +172,7 @@ class BleManager(
     fun getUsername(): String = ""
     fun getPublicKeyForUser(recipientId: String): PublicKey?
     fun onUserRssiReceived(userId: String, rssi: Int) {}
-    fun onMessageSent(userId: String) {}
+    fun onMessageSent(userId: String, messageId: String) {}
     fun onUserWriting(userId: String, isWriting: Boolean) {}
     fun getUserIdForAddress(address: String): String? = ""
     fun onMessageSendFailed(userId: String?, reason: String?) {}
@@ -182,5 +180,6 @@ class BleManager(
     fun getAddressForUserId(userId: String): String = ""
     fun onUserAdded(userId: String)
     fun connect(address: String) {}
+    fun onUserTxPowerReceived(userId: String, txPower: Int) {}
   }
 }

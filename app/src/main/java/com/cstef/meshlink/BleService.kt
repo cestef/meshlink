@@ -18,6 +18,8 @@ import com.cstef.meshlink.db.AppDatabase
 import com.cstef.meshlink.db.entities.Device
 import com.cstef.meshlink.managers.BleManager
 import com.cstef.meshlink.managers.EncryptionManager
+import com.cstef.meshlink.managers.LogcatMessage
+import com.cstef.meshlink.managers.LogsManager
 import com.cstef.meshlink.repositories.DeviceRepository
 import com.cstef.meshlink.repositories.MessageRepository
 import com.cstef.meshlink.util.struct.Chunk
@@ -39,6 +41,8 @@ class BleService : Service() {
   }
 
   inner class BleServiceBinder : Binder() {
+    val logcatLogs: MutableLiveData<List<LogcatMessage>>
+      get() = logsManager.logcatMessages
     val isAdvertising
       get() = bleManager.isAdvertising
     val service: BleService
@@ -59,10 +63,15 @@ class BleService : Service() {
       bleManager.setUserId(id)
     }
 
-    fun sendMessage(recipientId: String, message: String, type: String = Message.Type.TEXT) {
+    fun sendMessage(
+      recipientId: String,
+      message: String,
+      type: String = Message.Type.TEXT
+    ): String {
+      val id = UUID.randomUUID().toString()
       this@BleService.sendMessage(
         Message(
-          UUID.randomUUID().toString(),
+          id,
           userId,
           recipientId,
           message,
@@ -71,6 +80,7 @@ class BleService : Service() {
           true
         )
       )
+      return id
     }
 
     fun addDevice(userId: String) {
@@ -177,6 +187,7 @@ class BleService : Service() {
   val messagesHashes: MutableMap<String, MutableList<String>> = mutableMapOf()
   val chunks: MutableMap<String, MutableMap<Int, MutableList<Chunk>>> =
     mutableMapOf() // userId -> messageId -> chunks
+  val sentMessages: MutableMap<String, MutableList<String>> = mutableMapOf()
 
   private val bleDataExchangeManager = object : BleManager.BleDataExchangeManager {
     override fun connect(address: String) {
@@ -218,7 +229,8 @@ class BleService : Service() {
             name = null,
             blocked = false,
             publicKey = publicKey?.encoded?.let { Base64.encodeToString(it, Base64.DEFAULT) },
-            added = false
+            added = false,
+            txPower = 0
           )
         )
       } else {
@@ -241,10 +253,15 @@ class BleService : Service() {
       }
     }
 
-    override fun onMessageSent(userId: String) {
+    override fun onMessageSent(userId: String, messageId: String) {
       val sharedPreferences = getSharedPreferences("USER_STATS", MODE_PRIVATE)
-      val sentMessages = sharedPreferences.getInt("TOTAL_MESSAGES_DELIVERED", 0)
-      sharedPreferences.edit().putInt("TOTAL_MESSAGES_DELIVERED", sentMessages + 1).apply()
+      val deliveredMessages = sharedPreferences.getInt("TOTAL_MESSAGES_DELIVERED", 0)
+      sharedPreferences.edit().putInt("TOTAL_MESSAGES_DELIVERED", deliveredMessages + 1).apply()
+      // Add the message to the sent messages list
+      val sentMessagesForUser = sentMessages[userId] ?: mutableListOf()
+      sentMessagesForUser.add(messageId)
+      sentMessages[userId] = sentMessagesForUser
+      // Remove the message from the chunks list
       Log.d("BleService", "onMessageSent: $userId")
     }
 
@@ -258,9 +275,11 @@ class BleService : Service() {
       if (!bleManager.isConnected(address) && !bleManager.isConnecting(address)) {
         bleManager.connect(address)
       }
-      // is user blocked?
       val devices = allDevices?.value ?: emptyList()
       val device = devices.find { it.userId == getUserIdForAddress(address) }
+      if (device?.connected == false && bleManager.isConnected(address)) {
+        deviceRepository?.update(device.copy(connected = true))
+      }
       if (device != null && device.blocked) {
         Log.d("BleService", "onChunkReceived: user is blocked")
         return
@@ -387,7 +406,18 @@ class BleService : Service() {
       if (devices.isNotEmpty()) {
         devices.find { it.userId == userId }?.let { device ->
           if (device.rssi != rssi) {
-            deviceRepository?.update(device.copy(rssi = rssi))
+            deviceRepository?.update(device.copy(rssi = rssi, connected = true))
+          }
+        }
+      }
+    }
+
+    override fun onUserTxPowerReceived(userId: String, txPower: Int) {
+      val devices = allDevices?.value ?: return
+      if (devices.isNotEmpty()) {
+        devices.find { it.userId == userId }?.let { device ->
+          if (device.txPower != txPower) {
+            deviceRepository?.update(device.copy(txPower = txPower, connected = true))
           }
         }
       }
@@ -415,6 +445,7 @@ class BleService : Service() {
   }
   lateinit var bleManager: BleManager
   private lateinit var encryptionManager: EncryptionManager
+  lateinit var logsManager: LogsManager
 
   var allMessages: LiveData<List<com.cstef.meshlink.db.entities.Message>>? = null
   var allDevices: LiveData<List<Device>>? = null
@@ -433,6 +464,7 @@ class BleService : Service() {
     super.onCreate()
     handlerThread.start()
     handler = Handler(handlerThread.looper)
+    logsManager = LogsManager()
     encryptionManager = EncryptionManager()
     bleManager = BleManager(applicationContext, bleDataExchangeManager, encryptionManager, handler)
   }

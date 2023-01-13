@@ -191,11 +191,12 @@ class ServerBleManager(
         callbackHandler.post {
           device?.address?.let { dataExchangeManager.connect(it) }
         }
-      } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-        callbackHandler.post {
-          dataExchangeManager.onUserDisconnected(device?.address!!)
-        }
       }
+//      else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+//        callbackHandler.post {
+//          dataExchangeManager.onUserDisconnected(device?.address!!)
+//        }
+//      }
     }
   }
 
@@ -223,6 +224,7 @@ class ServerBleManager(
           .addServiceUuid(ParcelUuid.fromString(BleUuid.SERVICE_UUID))
           .setIncludeDeviceName(false)
           .setIncludeTxPowerLevel(false)
+          //.addManufacturerData(0xDEAD, byteArrayOf(0x00))
           .build()
       Log.d(
         "ServerBleManager",

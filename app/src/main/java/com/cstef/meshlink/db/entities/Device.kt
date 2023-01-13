@@ -15,4 +15,5 @@ data class Device(
   @ColumnInfo(name = "blocked") val blocked: Boolean = false,
   @ColumnInfo(name = "public_key") val publicKey: String? = null,
   @ColumnInfo(name = "added") val added: Boolean = false,
+  @ColumnInfo(name = "tx_power") val txPower: Int = 0,
 )
