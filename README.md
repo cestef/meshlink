@@ -19,7 +19,7 @@ To read more about MeshLink, visit [meshlink.cstef.dev](https://meshlink.cstef.d
 
 ## Screenshots
 
-<img src="assets/screenshots/scan.jpg" width="200" style="border-radius: 15px" /> <img src="assets/screenshots/user-profile-me.jpg" width="200" style="border-radius: 15px" /> <img src="assets/screenshots/user-profile.jpg" width="200" style="border-radius: 15px" /> <img src="assets/screenshots/chat-image.jpg" width="200" style="border-radius: 15px" />
+<img src="assets/screenshots/screenshot_1.jpg" width="200" style="border-radius: 15px" /> <img src="assets/screenshots/screenshot_2.jpg" width="200" style="border-radius: 15px" /> <img src="assets/screenshots/screenshot_3.jpg" width="200" style="border-radius: 15px" /> <img src="assets/screenshots/screenshot_4.jpg" width="200" style="border-radius: 15px" /> <img src="assets/screenshots/screenshot_5.jpg" width="200" style="border-radius: 15px" />
 
 ## Download
 
