@@ -5,18 +5,18 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import com.cstef.meshlink.db.entities.Message
+import com.cstef.meshlink.db.entities.DatabaseMessage
 
 @Dao
 interface MessageDao {
   @Query("SELECT * FROM messages")
-  fun getAllMessages(): LiveData<List<Message>>
+  fun getAllMessages(): LiveData<List<DatabaseMessage>>
 
   @Insert(onConflict = OnConflictStrategy.IGNORE)
-  fun insert(message: Message)
+  fun insert(databaseMessage: DatabaseMessage)
 
   @Insert(onConflict = OnConflictStrategy.IGNORE)
-  fun insertAll(messages: List<Message>)
+  fun insertAll(databaseMessages: List<DatabaseMessage>)
 
   @Query("DELETE FROM messages")
   fun deleteAll()

@@ -45,7 +45,6 @@ class BleManager(
       callbackHandler,
       encryptionManager,
       serviceHandler,
-      this
     )
   private val serverManager =
     ServerBleManager(context, dataExchangeManager, callbackHandler, encryptionManager, this)
@@ -70,11 +69,11 @@ class BleManager(
     if (deviceAddress != null && clientManager.connectedGattServers.containsKey(deviceAddress)) {
       Log.d("BleManager", clientManager.connectedGattServers[deviceAddress]?.device?.address!!)
       Log.d("BleManager", "Sending data to ${message.recipientId}")
-      clientManager.sendData(message)
+      clientManager.sendMessage(message)
     } else {
       Log.d("BleManager", "No connection to ${message.recipientId}, broadcasting data")
       if (message.type == Message.Type.TEXT) {
-        clientManager.broadcastData(message)
+        clientManager.broadcastMessage(message)
       } else {
         Log.e("BleManager", "Cannot broadcast other than text messages")
       }
@@ -83,7 +82,7 @@ class BleManager(
 
   fun broadcastMessage(message: Message) {
     if (message.type == Message.Type.TEXT) {
-      clientManager.broadcastData(message)
+      clientManager.broadcastMessage(message)
     } else {
       Log.e("BleManager", "Cannot broadcast other than text messages")
     }
@@ -175,7 +174,7 @@ class BleManager(
     fun onMessageSent(userId: String, messageId: String) {}
     fun onUserWriting(userId: String, isWriting: Boolean) {}
     fun getUserIdForAddress(address: String): String? = ""
-    fun onMessageSendFailed(userId: String?, reason: String?) {}
+    fun onMessageSendFailed(userId: String?, messageId: String, reason: String?) {}
     fun getKnownDevices(): List<Device> = emptyList()
     fun getAddressForUserId(userId: String): String = ""
     fun onUserAdded(userId: String)

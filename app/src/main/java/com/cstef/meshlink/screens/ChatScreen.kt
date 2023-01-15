@@ -35,11 +35,11 @@ import com.cstef.meshlink.util.struct.Message
 @ExperimentalMaterial3Api
 @Composable
 fun ChatScreen(
-  deviceId: String?,
-  allMessages: LiveData<List<com.cstef.meshlink.db.entities.Message>>,
-  allDevices: LiveData<List<Device>>,
-  sendMessage: (content: String, type: String) -> Unit,
-  onUserClick: (String) -> Unit,
+    deviceId: String?,
+    allMessages: LiveData<List<com.cstef.meshlink.db.entities.DatabaseMessage>>,
+    allDevices: LiveData<List<Device>>,
+    sendMessage: (content: String, type: String) -> Unit,
+    onUserClick: (String) -> Unit,
 ) {
   val devices by allDevices.observeAsState(listOf())
   val device = devices.find { it.userId == deviceId }
@@ -172,7 +172,7 @@ fun Avatar(
 fun Messages(
   modifier: Modifier = Modifier,
   deviceId: String,
-  allMessages: LiveData<List<com.cstef.meshlink.db.entities.Message>>
+  allMessages: LiveData<List<com.cstef.meshlink.db.entities.DatabaseMessage>>
 ) {
   val messages by allMessages.observeAsState(listOf())
   val scrollState = rememberLazyListState()
@@ -191,7 +191,7 @@ fun Messages(
       ChatMessage(
         type = message.type,
         content = message.content,
-        timestamp = message.timestamp,
+        timestamp = message.sent_timestamp,
         isMine = message.senderId != deviceId,
         showAvatar = false,
         senderId = message.senderId,

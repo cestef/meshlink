@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Feed
+import androidx.compose.material.icons.outlined.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -48,13 +49,13 @@ fun SettingsScreen(
             tint = colors.onSurface
           )
         }
-//        IconButton(onClick = goToBenchmark) {
-//          Icon(
-//            imageVector = Icons.Outlined.TrendingUp,
-//            contentDescription = "Go to benchmark screen",
-//            tint = colors.onSurface
-//          )
-//        }
+        IconButton(onClick = goToBenchmark) {
+          Icon(
+            imageVector = Icons.Outlined.TrendingUp,
+            contentDescription = "Go to benchmark screen",
+            tint = colors.onSurface
+          )
+        }
       }
     }
   )

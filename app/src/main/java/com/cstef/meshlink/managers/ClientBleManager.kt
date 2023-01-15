@@ -39,7 +39,6 @@ class ClientBleManager(
   private val callbackHandler: Handler,
   private val encryptionManager: EncryptionManager,
   handler: Handler,
-  private val parentManager: BleManager
 ) {
 
   private var rssiUpdateJob: Job? = null
@@ -49,7 +48,7 @@ class ClientBleManager(
   // Used to execute ble operation in sequence across one or
   // multiple device. All BLE callbacks should call OperationQueue#operationComplete
   private val operationQueue = OperationQueue(30000, handler)
-  private val chunksOperationQueue = OperationQueue(30000, handler)
+  private val chunksOperationQueue = OperationQueue(2500, handler)
 
   // references of the connected servers are kept so they can by manually
   // disconnected if this manager is stopped
@@ -58,16 +57,19 @@ class ClientBleManager(
   val connectedServersAddresses = mutableMapOf<String, String>()
 
   data class ChunkSendingState(
+    val address: String,
     var chunksSent: Int,
     val chunksTotal: Int,
     val userId: String,
     val notificationId: Int,
     val startTime: Long = System.currentTimeMillis(),
     val receiver: BroadcastReceiver,
-    val messageId: String
+    val messageId: String,
+    val isBenchmark: Boolean,
   )
 
-  private val sendingChunks = mutableMapOf<String, ChunkSendingState>()
+  private val chunksQueue = ArrayDeque<ChunkSendingState>()
+  private var currentChunkSendingState: ChunkSendingState? = null
 
   private val adapter: BluetoothAdapter? get() = (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
   private val scanner get() = adapter?.bluetoothLeScanner
@@ -100,14 +102,12 @@ class ClientBleManager(
             }
           }
           result.txPower.let { txPower ->
-            if (txPower == ScanResult.TX_POWER_NOT_PRESENT) {
-              Log.d("ClientBleManager", "onScanResult: txPower not present")
-              return@execute
-            }
-            connectedServersAddresses.entries.find { it.value == device.address }?.key.let { userId ->
-//              Log.d("ClientBleManager", "onScanResult: $userId $txPower")
-              if (userId != null) {
-                dataExchangeManager.onUserTxPowerReceived(userId, txPower)
+            if (txPower != ScanResult.TX_POWER_NOT_PRESENT) {
+              connectedServersAddresses.entries.find { it.value == device.address }?.key.let { userId ->
+              Log.d("ClientBleManager", "onScanResult: $userId $txPower")
+                if (userId != null) {
+                  dataExchangeManager.onUserTxPowerReceived(userId, txPower)
+                }
               }
             }
           }
@@ -141,14 +141,8 @@ class ClientBleManager(
                 connectingGattServers.remove(gatt.device.address)
                 val serverId =
                   connectedServersAddresses.entries.find { it.value == gatt.device.address }?.key
+                cancelSendingChunks(gatt.device.address, serverId, "Disconnected")
                 if (serverId != null) {
-                  if (sendingChunks.containsKey(gatt.device.address)) {
-                    sendingChunks.remove(gatt.device.address)
-                    val chunkSendingState = sendingChunks[gatt.device.address]
-                    val notificationId = chunkSendingState?.notificationId ?: serverId.hashCode()
-                    NotificationManagerCompat.from(context).cancel(notificationId)
-                    dataExchangeManager.onMessageSendFailed(serverId, "Connection error")
-                  }
                   connectedServersAddresses.remove(serverId)
                   dataExchangeManager.onUserDisconnected(serverId)
                 }
@@ -159,14 +153,8 @@ class ClientBleManager(
                 connectedGattServers.remove(gatt.device.address)
                 val serverId =
                   connectedServersAddresses.entries.find { it.value == gatt.device.address }?.key
+                cancelSendingChunks(gatt.device.address, serverId, "Connection error")
                 if (serverId != null) {
-                  if (sendingChunks.containsKey(gatt.device.address)) {
-                    sendingChunks.remove(gatt.device.address)
-                    val chunkSendingState = sendingChunks[gatt.device.address]
-                    val notificationId = chunkSendingState?.notificationId ?: serverId.hashCode()
-                    NotificationManagerCompat.from(context).cancel(notificationId)
-                    dataExchangeManager.onMessageSendFailed(serverId, "Connection error")
-                  }
                   connectedServersAddresses.remove(serverId)
                   connectingGattServers.remove(gatt.device.address)
                   dataExchangeManager.onUserDisconnected(serverId)
@@ -197,13 +185,7 @@ class ClientBleManager(
             val serverId =
               connectedServersAddresses.entries.find { it.value == gatt.device.address }?.key
             connectedServersAddresses.remove(serverId)
-            if (sendingChunks.containsKey(gatt.device.address)) {
-              sendingChunks.remove(gatt.device.address)
-              val chunkSendingState = sendingChunks[gatt.device.address]
-              val notificationId = chunkSendingState?.notificationId ?: serverId.hashCode()
-              NotificationManagerCompat.from(context).cancel(notificationId)
-              dataExchangeManager.onMessageSendFailed(serverId, "Connection error")
-            }
+            cancelSendingChunks(gatt.device.address, serverId, "Connection error")
             if (serverId != null) {
               dataExchangeManager.onUserDisconnected(serverId)
             }
@@ -213,6 +195,30 @@ class ClientBleManager(
         else -> {
           Log.w("ClientBleManager", "onConnectionStateChange: unknown state $newState")
         }
+      }
+    }
+
+    private fun cancelSendingChunks(
+      address: String,
+      serverId: String?,
+      reason: String = "Connection error"
+    ) {
+      if (chunksQueue.any { it.address == address }) {
+        chunksQueue.filter { it.address == address }.forEach { chunk ->
+          chunksQueue.remove(chunk)
+          dataExchangeManager.onMessageSendFailed(serverId, chunk.messageId, reason)
+        }
+      }
+      if (currentChunkSendingState?.address == address) {
+        val notificationId = currentChunkSendingState?.notificationId ?: address.hashCode()
+        NotificationManagerCompat.from(context).cancel(notificationId)
+        currentChunkSendingState?.messageId?.let {
+          dataExchangeManager.onMessageSendFailed(
+            serverId,
+            it, reason
+          )
+        }
+        currentChunkSendingState = chunksQueue.poll()
       }
     }
 
@@ -316,7 +322,7 @@ class ClientBleManager(
       )
       chunksOperationQueue.operationComplete()
 
-      val chunkState = sendingChunks[gatt?.device?.address]
+      val chunkState = currentChunkSendingState
       val builder = NotificationCompat.Builder(context, "data")
         .setSmallIcon(R.drawable.ic_baseline_bluetooth_24)
 
@@ -335,7 +341,7 @@ class ClientBleManager(
             context.unregisterReceiver(chunkState.receiver)
             val notificationManager = NotificationManagerCompat.from(context)
             notificationManager.cancel(chunkState.notificationId)
-            sendingChunks.remove(gatt?.device?.address)
+            currentChunkSendingState = chunksQueue.poll()
             callbackHandler.post {
               dataExchangeManager.onMessageSent(chunkState.userId, chunkState.messageId)
             }
@@ -361,11 +367,16 @@ class ClientBleManager(
               )
             )
             val notificationManager = NotificationManagerCompat.from(context)
-            notificationManager.notify(chunkState.notificationId, builder.build())
+
+            if (!chunkState.isBenchmark) {
+              notificationManager.notify(chunkState.notificationId, builder.build())
+            }
           }
         } else {
-          Log.e("ClientBleManager", "onCharacteristicWrite: chunkState == null")
+          Log.e("ClientBleManager", "onCharacteristicWrite: state != SUCCESS")
         }
+      } else {
+        Log.e("ClientBleManager", "onCharacteristicWrite: chunkState == null")
       }
     }
 
@@ -386,7 +397,7 @@ class ClientBleManager(
           }
         } else {
           Log.e("ClientBleManager", "onReadRemoteRssi: userId == null: ${gatt?.device?.address}")
-          gatt?.disconnect()
+          //gatt?.disconnect()
         }
       } else {
         Log.e("ClientBleManager", "onReadRemoteRssi: failed to read rssi")
@@ -466,28 +477,40 @@ class ClientBleManager(
       )
     val notificationManager = NotificationManagerCompat.from(context)
     val notificationId = message.id.toByteArray().sum().absoluteValue
-    notificationManager.notify(
-      notificationId, builder.build()
-    )
+    if (message.type != Message.Type.BENCHMARK) {
+      notificationManager.notify(
+        notificationId, builder.build()
+      )
+    }
     val receiver = object : BroadcastReceiver() {
       override fun onReceive(context: Context?, intent: Intent?) {
         Log.d("ClientBleManager", "onReceive: cancel_sending")
         chunksOperationQueue.clear()
-        sendingChunks.remove(device.address)
         notificationManager.cancel(notificationId)
         context?.unregisterReceiver(this)
-        dataExchangeManager.onMessageSendFailed(message.recipientId, "Cancelled by user")
+        dataExchangeManager.onMessageSendFailed(
+          message.recipientId,
+          message.id,
+          "Cancelled by user"
+        )
       }
     }
-    sendingChunks[device.address] = ChunkSendingState(
-      chunksSent = 0,
-      chunksTotal = chunks.size,
-      userId = message.recipientId ?: "",
-      notificationId = notificationId,
-      startTime = System.currentTimeMillis(),
-      receiver = receiver,
-      messageId = message.id
+    chunksQueue.add(
+      ChunkSendingState(
+        address = device.address,
+        chunksSent = 0,
+        chunksTotal = chunks.size,
+        userId = message.recipientId ?: "",
+        notificationId = notificationId,
+        startTime = System.currentTimeMillis(),
+        receiver = receiver,
+        messageId = message.id,
+        isBenchmark = message.type == Message.Type.BENCHMARK
+      )
     )
+    if (currentChunkSendingState == null) {
+      currentChunkSendingState = chunksQueue.poll()
+    }
     context.registerReceiver(receiver, IntentFilter("cancel_sending"))
     chunks.forEachIndexed { index, chunk ->
       val chunkValue = Chunk(index == chunks.size - 1, index.toShort(), chunk, value.hashCode())
@@ -496,8 +519,9 @@ class ClientBleManager(
           "ClientBleManager",
           "writeData: timeout (to ${message.recipientId})"
         )
-        dataExchangeManager.onMessageSendFailed(message.recipientId, "Timeout")
-        sendingChunks.remove(device.address)
+        dataExchangeManager.onMessageSendFailed(message.recipientId, message.id, "Timeout")
+        chunksQueue.removeAll { it.address == device.address }
+        currentChunkSendingState = chunksQueue.poll()
         disconnect()
       }) {
         sendChunk(chunkValue)
@@ -531,14 +555,14 @@ class ClientBleManager(
     }
   }
 
-  fun broadcastData(message: Message) {
+  fun broadcastMessage(message: Message) {
     connectedGattServers.values.filter { connectedServersAddresses.entries.find { entry -> entry.value == it.device.address }?.key != message.senderId }
       .forEach {
         it.writeMessage(message)
       }
   }
 
-  fun sendData(message: Message) {
+  fun sendMessage(message: Message) {
     val deviceAddress = connectedServersAddresses[message.recipientId]
     if (deviceAddress != null) {
       connectedGattServers[deviceAddress]?.writeMessage(message)

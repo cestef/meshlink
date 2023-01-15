@@ -15,6 +15,7 @@ import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import com.cstef.meshlink.db.AppDatabase
+import com.cstef.meshlink.db.entities.DatabaseMessage
 import com.cstef.meshlink.db.entities.Device
 import com.cstef.meshlink.managers.BleManager
 import com.cstef.meshlink.managers.EncryptionManager
@@ -27,6 +28,7 @@ import com.cstef.meshlink.util.struct.Message
 import com.daveanthonythomas.moshipack.MoshiPack
 import java.security.PublicKey
 import java.util.*
+import kotlin.random.Random
 
 
 class BleService : Service() {
@@ -53,7 +55,7 @@ class BleService : Service() {
       get() = this@BleService.isDatabaseLoading
     val databaseError: LiveData<String>
       get() = this@BleService.databaseError
-    val allMessages: LiveData<List<com.cstef.meshlink.db.entities.Message>>
+    val allMessages: LiveData<List<DatabaseMessage>>
       get() = this@BleService.allMessages ?: throw Exception("Database not open")
     val allDevices: LiveData<List<Device>>
       get() = this@BleService.allDevices ?: throw Exception("Database not open")
@@ -64,20 +66,12 @@ class BleService : Service() {
     }
 
     fun sendMessage(
-      recipientId: String,
-      message: String,
-      type: String = Message.Type.TEXT
+      recipientId: String, message: String, type: String = Message.Type.TEXT
     ): String {
       val id = UUID.randomUUID().toString()
       this@BleService.sendMessage(
         Message(
-          id,
-          userId,
-          recipientId,
-          message,
-          type,
-          System.currentTimeMillis(),
-          true
+          id, userId, recipientId, message, type, System.currentTimeMillis(), true
         )
       )
       return id
@@ -99,8 +93,7 @@ class BleService : Service() {
         encryptionManager.getPublicKeySignature(
           encryptionManager.getPublicKey(
             Base64.decode(
-              device.publicKey,
-              Base64.DEFAULT
+              device.publicKey, Base64.DEFAULT
             )
           )
         )
@@ -187,7 +180,12 @@ class BleService : Service() {
   val messagesHashes: MutableMap<String, MutableList<String>> = mutableMapOf()
   val chunks: MutableMap<String, MutableMap<Int, MutableList<Chunk>>> =
     mutableMapOf() // userId -> messageId -> chunks
-  val sentMessages: MutableMap<String, MutableList<String>> = mutableMapOf()
+
+  data class SentAndReceived(
+    val sent: Long, val received: Long
+  )
+
+  var currentBenchmarkSentMessagesTimestamps: MutableMap<String, SentAndReceived> = mutableMapOf()
 
   private val bleDataExchangeManager = object : BleManager.BleDataExchangeManager {
     override fun connect(address: String) {
@@ -236,18 +234,15 @@ class BleService : Service() {
       } else {
         devices.find { it.userId == userId }?.let { device ->
           deviceRepository?.update(
-            device.copy(
-              address = address,
+            device.copy(address = address,
               rssi = 0,
               lastSeen = System.currentTimeMillis(),
               connected = true,
               publicKey = device.publicKey ?: publicKey?.encoded?.let {
                 Base64.encodeToString(
-                  it,
-                  Base64.DEFAULT
+                  it, Base64.DEFAULT
                 )
-              }
-            )
+              })
           )
         }
       }
@@ -257,12 +252,11 @@ class BleService : Service() {
       val sharedPreferences = getSharedPreferences("USER_STATS", MODE_PRIVATE)
       val deliveredMessages = sharedPreferences.getInt("TOTAL_MESSAGES_DELIVERED", 0)
       sharedPreferences.edit().putInt("TOTAL_MESSAGES_DELIVERED", deliveredMessages + 1).apply()
-      // Add the message to the sent messages list
-      val sentMessagesForUser = sentMessages[userId] ?: mutableListOf()
-      sentMessagesForUser.add(messageId)
-      sentMessages[userId] = sentMessagesForUser
-      // Remove the message from the chunks list
-      Log.d("BleService", "onMessageSent: $userId")
+      currentBenchmarkSentMessagesTimestamps[messageId] = SentAndReceived(
+        currentBenchmarkSentMessagesTimestamps[messageId]?.sent ?: 0, System.currentTimeMillis()
+      )
+      Log.d("BleService", "onMessageSent: ${currentBenchmarkSentMessagesTimestamps.size}")
+      Log.d("BleService", "onMessageSent: $userId, $messageId")
     }
 
     override fun onChunkReceived(chunk: Chunk, address: String) {
@@ -315,6 +309,7 @@ class BleService : Service() {
           Log.d("BleService", "Message in cache")
           return
         }
+        if (message.type == Message.Type.BENCHMARK) return
         if (message.recipientId == userId || message.recipientId == "broadcast") {
           val sharedPreferences = getSharedPreferences("USER_STATS", MODE_PRIVATE)
           val receivedMessages = sharedPreferences.getInt("TOTAL_MESSAGES_RECEIVED", 0)
@@ -326,7 +321,7 @@ class BleService : Service() {
             encryptionManager.decrypt(message.content)
 
           messageRepository?.insert(
-            com.cstef.meshlink.db.entities.Message(
+            DatabaseMessage(
               message.id,
               message.senderId,
               message.recipientId,
@@ -345,19 +340,14 @@ class BleService : Service() {
 //            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 //          )
           val notification = NotificationCompat.Builder(this@BleService, "messages")
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("MeshLink")
-            .setContentText(
-              if (message.type == Message.Type.TEXT) "${message.senderId}: ${message.content}" else "${message.senderId}: ${
-                message.type.replaceFirstChar {
-                  if (it.isLowerCase()) it.titlecase(
-                    Locale.ROOT
-                  ) else it.toString()
-                }
-              }"
-            )
-            .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setSmallIcon(R.drawable.ic_launcher_foreground).setContentTitle("MeshLink")
+            .setContentText(if (message.type == Message.Type.TEXT) "${message.senderId}: ${message.content}" else "${message.senderId}: ${
+              message.type.replaceFirstChar {
+                if (it.isLowerCase()) it.titlecase(
+                  Locale.ROOT
+                ) else it.toString()
+              }
+            }").setAutoCancel(true).setPriority(NotificationCompat.PRIORITY_DEFAULT)
 //            .setContentIntent(pendingIntent)
             .build()
           notificationManager.notify(
@@ -372,11 +362,19 @@ class BleService : Service() {
       }
     }
 
-    override fun onMessageSendFailed(userId: String?, reason: String?) {
+    override fun onMessageSendFailed(userId: String?, messageId: String, reason: String?) {
       Log.d("BleService", "onMessageSendFailed: $userId")
       val sharedPreferences = getSharedPreferences("USER_STATS", Context.MODE_PRIVATE)
       val failedMessages = sharedPreferences.getInt("TOTAL_MESSAGES_FAILED", 0)
       sharedPreferences.edit().putInt("TOTAL_MESSAGES_FAILED", failedMessages + 1).apply()
+//      val message = messageRepository?.allMessages?.value?.find { it.messageId == messageId }
+//      if (message != null) {
+//        messageRepository?.updateStatus(messageId, Message.Status.FAILED)
+//      }
+      currentBenchmarkSentMessagesTimestamps[messageId] = SentAndReceived(
+        currentBenchmarkSentMessagesTimestamps[messageId]?.sent ?: 0,
+        -1
+      )
       Toast.makeText(application, "Message to $userId failed: $reason", Toast.LENGTH_LONG).show()
     }
 
@@ -394,8 +392,7 @@ class BleService : Service() {
       return allDevices?.value?.find { it.userId == recipientId }?.publicKey?.let {
         encryptionManager.getPublicKey(
           Base64.decode(
-            it,
-            Base64.DEFAULT
+            it, Base64.DEFAULT
           )
         )
       }
@@ -447,7 +444,7 @@ class BleService : Service() {
   private lateinit var encryptionManager: EncryptionManager
   lateinit var logsManager: LogsManager
 
-  var allMessages: LiveData<List<com.cstef.meshlink.db.entities.Message>>? = null
+  var allMessages: LiveData<List<DatabaseMessage>>? = null
   var allDevices: LiveData<List<Device>>? = null
   val isDatabaseOpen = MutableLiveData(false)
   val isDatabaseLoading = MutableLiveData(false)
@@ -486,32 +483,98 @@ class BleService : Service() {
     val sharedPreferences = getSharedPreferences("USER_STATS", Context.MODE_PRIVATE)
     val sentMessages = sharedPreferences.getInt("TOTAL_MESSAGES_SENT", 0)
     sharedPreferences.edit().putInt("TOTAL_MESSAGES_SENT", sentMessages + 1).apply()
-    if (message.recipientId != null && message.recipientId.isNotEmpty() && message.recipientId != "broadcast") {
+    if (message.recipientId != null && message.recipientId.isNotEmpty() && message.recipientId != "broadcast" && message.type != Message.Type.BENCHMARK) {
       messageRepository?.insert(
-        com.cstef.meshlink.db.entities.Message(
-          message.id,
-          message.senderId,
-          message.recipientId,
-          message.content,
-          message.type,
-          message.timestamp
+        DatabaseMessage(
+          messageId = message.id,
+          senderId = message.senderId,
+          recipientId = message.recipientId,
+          content = message.content,
+          type = message.type,
+          sent_timestamp = message.timestamp
         )
+      )
+      currentBenchmarkSentMessagesTimestamps[message.id] = SentAndReceived(
+        sent = message.timestamp, received = 0L
       )
       bleManager.sendMessage(message)
     } else if (message.recipientId == "broadcast") {
       messageRepository?.insert(
-        com.cstef.meshlink.db.entities.Message(
-          message.id,
-          message.senderId,
-          message.recipientId,
-          message.content,
-          message.type,
-          message.timestamp
+        DatabaseMessage(
+          messageId = message.id,
+          senderId = message.senderId,
+          recipientId = message.recipientId,
+          content = message.content,
+          type = message.type,
+          sent_timestamp = message.timestamp
         )
       )
       bleManager.broadcastMessage(message)
     }
   }
+
+  fun benchmark(
+    onFinish: (results: BenchmarkResults) -> Unit = {}
+  ) {
+    Thread {
+      val device = allDevices?.value?.first() ?: return@Thread onFinish(
+        BenchmarkResults(
+          status = BenchmarkResults.Status.FAILURE, results = emptyList()
+        )
+      )
+      val benchmarkMessageIds = mutableListOf<String>()
+      currentBenchmarkSentMessagesTimestamps.clear()
+      for (i in 0..50) {
+        val content = Random.nextBytes(1000).toString()
+        val messageId = UUID.randomUUID().toString()
+        sendMessage(
+          Message(
+            id = messageId,
+            senderId = device.userId,
+            recipientId = device.userId,
+            content = content,
+            type = Message.Type.BENCHMARK,
+            timestamp = System.currentTimeMillis(),
+            isMe = true
+          )
+        )
+        benchmarkMessageIds += messageId
+      }
+      val started = System.currentTimeMillis()
+      while (currentBenchmarkSentMessagesTimestamps.filter {
+          benchmarkMessageIds.contains(it.key) && it.value.received != 0L
+        }.size != benchmarkMessageIds.size || System.currentTimeMillis() - started > 10000) {
+        Thread.sleep(100)
+      }
+      val messages =
+        currentBenchmarkSentMessagesTimestamps.filter { benchmarkMessageIds.contains(it.key) }
+      val results = messages.map { message ->
+        BenchmarkResults.Result(
+          status = if (message.value.received != 0L) BenchmarkResults.Status.SUCCESS else BenchmarkResults.Status.FAILURE,
+          value = message.value.received - message.value.sent,
+          messageId = message.key
+        )
+      }
+      onFinish(
+        BenchmarkResults(
+          status = BenchmarkResults.Status.SUCCESS, results = results.slice(1..49)
+        )
+      )
+    }.start()
+  }
+
+  class BenchmarkResults(
+    val status: Status, val results: List<Result>
+  ) {
+    enum class Status {
+      SUCCESS, FAILURE,
+    }
+
+    data class Result(
+      val status: Status, val value: Long, val messageId: String
+    )
+  }
+
 
 //  private fun sendIsWriting(userId: String, writing: Boolean) {
 //    bleManager.sendIsWriting(userId, writing)

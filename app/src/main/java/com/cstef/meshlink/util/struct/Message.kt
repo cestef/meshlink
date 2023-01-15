@@ -18,4 +18,12 @@ data class Message(
       // const val FILE = "file"
     }
   }
+
+  class Status {
+    companion object {
+      const val SENT = "sent"
+      const val RECEIVED = "received"
+      const val FAILED = "failed"
+    }
+  }
 }
