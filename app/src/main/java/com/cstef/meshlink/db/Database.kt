@@ -7,16 +7,16 @@ import androidx.room.RoomDatabase
 import com.cstef.meshlink.db.dao.DeviceDao
 import com.cstef.meshlink.db.dao.MessageDao
 import com.cstef.meshlink.db.entities.Device
-import com.cstef.meshlink.db.entities.Message
+import com.cstef.meshlink.db.entities.DatabaseMessage
 import net.sqlcipher.database.SQLiteDatabase
 import net.sqlcipher.database.SupportFactory
 
 @Database(
   entities = [
     Device::class,
-    Message::class,
+    DatabaseMessage::class,
   ],
-  version = 17,
+  version = 19,
   exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

@@ -96,4 +96,5 @@ dependencies {
   // Charts
   implementation "com.patrykandpatrick.vico:compose:1.6.2"
   implementation "com.patrykandpatrick.vico:compose-m3:1.6.2"
+  implementation 'com.github.doyaaaaaken:kotlin-csv-jvm:1.7.0'
 }

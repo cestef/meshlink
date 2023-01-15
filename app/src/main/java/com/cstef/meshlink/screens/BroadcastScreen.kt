@@ -11,16 +11,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.LiveData
-import com.cstef.meshlink.db.entities.Message
+import com.cstef.meshlink.db.entities.DatabaseMessage
 import com.cstef.meshlink.ui.components.ChatMessage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BroadcastScreen(
-  myId: String,
-  allMessages: LiveData<List<Message>>,
-  sendMessage: (content: String, type: String) -> Unit,
-  onUserClick: (String) -> Unit,
+    myId: String,
+    allMessages: LiveData<List<DatabaseMessage>>,
+    sendMessage: (content: String, type: String) -> Unit,
+    onUserClick: (String) -> Unit,
 ) {
   Column(
     modifier = Modifier.fillMaxSize()
@@ -60,10 +60,10 @@ fun BroadcastScreen(
 
 @Composable
 fun Messages(
-  modifier: Modifier = Modifier,
-  allMessages: LiveData<List<Message>>,
-  myId: String,
-  onUserClick: (String) -> Unit = {},
+    modifier: Modifier = Modifier,
+    allMessages: LiveData<List<DatabaseMessage>>,
+    myId: String,
+    onUserClick: (String) -> Unit = {},
 ) {
   val messages by allMessages.observeAsState(listOf())
   val scrollState = rememberLazyListState()
@@ -85,7 +85,7 @@ fun Messages(
       ChatMessage(
         type = message.type,
         content = message.content,
-        timestamp = message.timestamp,
+        timestamp = message.sent_timestamp,
         isMine = message.senderId == myId,
         showAvatar = true,
         senderId = message.senderId
