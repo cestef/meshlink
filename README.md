@@ -3,7 +3,7 @@
 
 <img src="assets/banner.png" style="border-radius: 15px" />
 
-# :warning: WARNING: This is still in heavy development, except bugs and crashes if you try to use this app.
+# :warning: WARNING: This is still in heavy development, expect bugs and crashes if you try to use this app.
 
 ### Decentralized and private peer-to-peer messaging
 
