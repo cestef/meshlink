@@ -3,6 +3,8 @@
 
 <img src="assets/banner.png" style="border-radius: 15px" />
 
+# :warning: WARNING: This is still in heavy development, except bugs and crashes if you try to use this app.
+
 ### Decentralized and private peer-to-peer messaging
 
 To read more about MeshLink, visit [meshlink.cstef.dev](https://meshlink.cstef.dev).
