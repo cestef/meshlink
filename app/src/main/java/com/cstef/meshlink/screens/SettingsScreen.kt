@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.cstef.meshlink.BuildConfig
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,19 +43,21 @@ fun SettingsScreen(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.End
       ) {
-        IconButton(onClick = goToLogs) {
-          Icon(
-            imageVector = Icons.Filled.Feed,
-            contentDescription = "Go to logs screen",
-            tint = colors.onSurface
-          )
-        }
-        IconButton(onClick = goToBenchmark) {
-          Icon(
-            imageVector = Icons.Outlined.TrendingUp,
-            contentDescription = "Go to benchmark screen",
-            tint = colors.onSurface
-          )
+        if (BuildConfig.DEBUG) {
+          IconButton(onClick = goToLogs) {
+            Icon(
+              imageVector = Icons.Filled.Feed,
+              contentDescription = "Go to logs screen",
+              tint = colors.onSurface
+            )
+          }
+          IconButton(onClick = goToBenchmark) {
+            Icon(
+              imageVector = Icons.Outlined.TrendingUp,
+              contentDescription = "Go to benchmark screen",
+              tint = colors.onSurface
+            )
+          }
         }
       }
     }
