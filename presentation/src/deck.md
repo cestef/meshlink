@@ -14,7 +14,7 @@ math: mathjax
 
 ```kotlin
 fun main() {
-    println("Hello, world!")
+    println("Hello, MeshLink!")
 }
 ```
 #### Par *****REMOVED*****
@@ -31,21 +31,46 @@ fun main() {
 
 # Contenu de la présentation
 
-5) Schémas
-6) Problèmes rencontrés
-7) Évaluation
-8) Conclusion
-9) Démonstration
+5) Problèmes rencontrés
+6) Rendu final
+7) Evaluation
+8) Résultats
 
 ---
 
-# Problématique
+# Contenu de la présentation
 
-### Comment réaliser un système décentralisé de messagerie utilisant le Bluetooth en remplacement d'un réseau mobile ?
+9) Analyse et discussion
+10) Conclusion
 
 ---
 
-# Motivations
+# 1. Problématique
+
+### Comment réaliser un système décentralisé de messagerie utilisant le Bluetooth en alternative à un réseau mobile ?
+
+---
+
+<!--
+
+- La mode actuelle de décentraliser tout et n'importe quoi
+  - Blockchain (Bitcoin)
+  - Réseaux sociaux (Mastodon)
+  - Messagerie (Matrix)
+
+- La prise de conscience de la surveillance de masse
+  - Edward Snowden
+  - Affaire Huawei
+
+- Mène à une réflexion sur la sécurité des données
+  - Chiffrement
+  - Sécurité des réseaux
+
+- La passion pour la programmation et l'informatique en général
+
+-->
+
+# 2. Motivations
 
 * :link: Décentralisation
 
@@ -55,7 +80,7 @@ fun main() {
 
 ---
 
-# Concept
+# 3. Concept
 
 * :iphone: Application mobile (Android)
 
@@ -69,29 +94,46 @@ fun main() {
 
 ---
 
-# Technologies utilisées
+# 4. Technologies utilisées
 
 * :iphone: Kotlin
 
 ---
 
-![width:30cm](../images/kotlin-happy.png)
+![width:30cm](./images/kotlin-happy.png)
 
-<!-- Un langage de programmation moderne qui rend les développeurs plus heureux. -->
+<!-- 
+
+- Un langage de programmation moderne qui rend les développeurs plus heureux.
+
+- Si je peux me permettre, j'ai plutôt fini avec des maux de tête et des cheveux arrachés devant du code qui marche pas plutôt que des sourires, mais bon... 
+  
+-->
 
 ---
+
+<!--
+- License Apache:
+  - Free software
+  - Open-source
+
+- Sorti en 2011
+
+- Officiellement supporté par Google pour Android
+-->
 
 ## Kotlin
 
 * Développé par JetBrains
 * Similaire au Java
-* Courbe d'apprentissage faible
+* Aisé à apprendre
+* License: Apache 2.0
 
-![bg right 75%](../images/kotlin.png)
+![bg right 75%](./images/kotlin.png)
 
 ---
 
-# Technologies utilisées
+# 4. Technologies utilisées
 
 - :iphone: Kotlin
 
@@ -99,18 +141,33 @@ fun main() {
 
 ---
 
+<!--
+- Dérivé basse consommation du Bluetooth
+
+- Géré par le Special Interest Group (SIG)
+  - Fondé en 1999
+  - Nokia, IBM, Intel, Toshiba, Ericsson
+
+- Standardisé en 2009 (Bluetooth 4.0)
+
+- Consommation: 10x moins que le Bluetooth
+
+- Omniprésent: Plusieurs milliards d'appareils
+-->
+
 ## Bluetooth Low Energy
 
-* Créé par Nokia en 2006
+* Initié par Nokia, 2006
 * Basé sur le Bluetooth
-* Consommation réduite (~10x)
+* Faible consommation
+* Omniprésent
 
-![bg right 50%](../images/bluetooth.png)
+![bg right 50%](./images/bluetooth.png)
 
 
 ---
 
-# Technologies utilisées
+# 4. Technologies utilisées
 
 - :iphone: Kotlin
 
@@ -120,17 +177,32 @@ fun main() {
 
 ---
 
+<!-- 
+- Utilisé par:
+  - Skype
+  - Firefox
+  - Apple
+  - Adobe
+  - McAfee
+
+- Uniquement géré par l'applcatif (embarqué)
+
+- Ecrit en C
+
+ -->
+
 ## SQLite
 
-* Permet le stockage de données dans un fichier
-* Requêtes SQL
-* Utilisé par Android (Room)
+* *BDD* relationnelle
+* Stockage fichier local
+* Populaire, Android
+* Open-Source
 
-![bg right 75%](../images/sqlite.png)
+![bg right 75%](./images/sqlite.png)
 
 ---
 
-# Technologies utilisées
+# 4. Technologies utilisées
 
 - :iphone: Kotlin
 
@@ -142,18 +214,23 @@ fun main() {
 
 ---
 
+<!--
+- Open-source pour la version "community"
+-->
+
 ## SQLCipher
 
-* Chiffrement AES-256
+* Chiffrement SQLite AES-256
 * Transparent pour l'utilisateur
 * Facile à intégrer
+* Open-Source (BSD)
 
-![bg right 60%](../images/lock.png)
+![bg right 60%](./images/lock.png)
 
 
 ---
 
-# Technologies utilisées
+# 4. Technologies utilisées
 
 - :iphone: Kotlin
 
@@ -167,6 +244,14 @@ fun main() {
 
 ---
 
+<!--
+- RSA: "Rivest–Shamir–Adleman"
+  - Noms des inventeurs
+
+- AES: "Advanced Encryption Standard"
+  - Etabli par le NIST (National Institute of Standards and Technology)
+-->
+
 ## RSA-2048 + AES-256
 
 * Asymétrique (RSA)
@@ -174,31 +259,15 @@ fun main() {
 * Symétrique (AES)
 * Pas de limite de taille
 
-![bg right 60%](../images/lock_key.png)
+![bg right 60%](./images/lock_key.png)
 
 ---
 
-## Procédure de chiffrement
-
-### **Bob** envoie un message à **Alice**
-
-1) <u>Bob</u> génère une clé éphémère AES-256 aléatoire
-2) <u>Bob</u> chiffre le message avec la clé AES-256
-3) <u>Bob</u> chiffre la clé éphémère avec la clé publique RSA-2048 d'<u>Alice</u>
-4) <u>Bob</u> envoie le message et la clé chiffrés à <u>Alice</u>
+# <!--fit-->Procédure de chiffrement
 
 ---
 
-## Procédure de déchiffrement
-
-### **Alice** reçoit un message de **Bob**
-
-1) <u>Alice</u> déchiffre la clé éphémère (AES-256) avec sa clé privée (RSA-2048)
-2) <u>Alice</u> déchiffre le message avec la clé éphémère
-
----
-
-# Technologies utilisées
+# 4. Technologies utilisées
 
 - :iphone: Kotlin
 
@@ -214,33 +283,47 @@ fun main() {
 
 ---
 
+<!--
+- Multi-langages
+
+- Un gars dans un garage
+-->
+
 ## MsgPack
 
 * Compact et rapide
 * Concurrence le JSON
 * Format de données binaires
+* License: Apache 2.0
 
-![bg right 75%](../images/messagepack.png)
+![bg right 75%](./images/messagepack.png)
+
+---
+
+## Tech-stack
+
+---
+
+![bg contain](./images/diagrams/stack.png)
 
 ---
 
 # Comme dans tout projet...
 
 ---
-# <!--fit--> Problèmes
+# <!--fit--> 5. Problèmes
 
 ---
 
 ## Quantité de données par tranmission
 
 * :x: 512 octets (BLE) (-10 octets pour l'en-tête)
-* :white_check_mark: Séparation des messages en plusieurs morceaux
 
 ---
 
-## En-tête d'un morceau
+## Quantité de données par tranmission
 
-![](../images/diagrams/chunk-dark.png)
+- :x: 502 octets (BLE)
 
 ---
 
@@ -248,6 +331,34 @@ fun main() {
 
 - :x: 502 octets (BLE)
 - :white_check_mark: Séparation des messages en plusieurs morceaux
+
+---
+
+<!--
+- Pour achever une séparation optimale, il faut plusieurs parties:
+  - Un en-tête
+  - Un corps
+
+- L'en-tête contient:
+  - Informations d'identification
+
+- En-tete doit être le plus petit possible
+  - Pour maximiser la taille du corps -> données "utiles"
+
+Pour résumer, il faut:
+-->
+
+## Séparation
+
+* :label: Identifiables
+* :arrows_counterclockwise: Déassemblables / Réassemblables
+* :mag: Détection d'erreurs
+
+---
+
+## Structure de l'en-tête d'un morceau
+
+![](./images/diagrams/chunk-dark.png)
 
 ---
 
@@ -264,13 +375,13 @@ $$
 - $c$ : Taille maximale d'un morceau
 
 ---
-
 ## Exemple
 
-### **Elon** veut envoyer le script entier de Shrek à **Jeff**
+### **Elon** doit absolument envoyer le script entier du film *Shrek* à **Jeff**
 #### _(54'350 octets)_
 ---
 
+## Exemple
 
 $$
 \begin{aligned}
@@ -294,7 +405,6 @@ $$
 ## Identifiant d'utilisateur
 
 * :x: `7092b805-e3b1-4a86-bc0a-df80ed89a9c4`
-* :white_check_mark: `awesome-unicorn-420`
 
 ---
 
@@ -329,67 +439,163 @@ $$
 
 ---
 
-# <!--fit--> 1 chance sur 3.6 milliards
-
----
-
-# Évaluation
-
-* 3 scénarios
-* Courte et longue distance
-* 1 à 3 utilisateurs
-
----
-
-## Scénario 1
-
-### **Alice** envoie un message à **Bob**
-
-#### (one-to-one)
-
-![bg right 75%](../images/diagrams/alice-bob.png)
-
----
-
-![](../images/diagrams/one-to-one-dark.png)
-
----
-
-## Scénario 2
-
-### **Alice** envoie un message à **Bob** et **Charlie**
-
-#### (one-to-many, broadcast)
-
-![bg right 75%](../images/diagrams/alice-bob+charlie.png)
-
----
-
-![](../images/diagrams/one-to-many-dark.png)
-
----
-
-## Scénario 3
-
-### **Alice** envoie un message à **Bob**, en passant par **Charlie**
-
-#### (one-to-one, relayed)
-
-![bg right 90%](../images/diagrams/alice-bob-charlie.png)
-
----
-
-![](../images/diagrams/one-to-one-relayed-dark.png)
-
----
-
-# Conclusion
-
+# <!--fit--> 1 chance sur **3.6** milliards
 
 
 ---
 
-# <!--fit--> Démonstration « live »
+## Identifiant d'utilisateur
+
+- :x: `7092b805-e3b1-4a86-bc0a-df80ed89a9c4`
+- :white_check_mark: `awesome-unicorn-420`
+
+---
+
+
+# 6. Rendu final
+
+---
+
+![bg contain](./images/diagrams/flowchart.png)
+
+---
+
+![bg contain](./images/diagrams/flowchart-v2.png)
+
+---
+
+![bg contain](./images/diagrams/flowchart-simplified.png)
+
+---
+
+![bg contain](./images/screenshots/5.jpg)
+![bg contain](./images/screenshots/1.jpg)
+![bg contain](./images/screenshots/3.jpg)
+
+---
+
+![bg contain](./images/screenshots/2.jpg)
+![bg contain](./images/screenshots/4.jpg)
+![bg contain](./images/screenshots/6.jpg)
+
+
+---
+<!--
+- Deux scénarios:
+1.	Deux utilisateurs à distance variable (jusqu’à 70 mètres) communiquent de proche en proche, en ligne de vue.
+
+2.	Deux utilisateurs communiquent ensemble sans ligne de vue, via un relai.
+-->
+
+# 7. Évaluation
+
+---
+
+# Scénario 1
+
+---
+
+<!--
+- Vise à tester la distance maximale
+-->
+
+![bg contain](./images/diagrams/direct-maps.png)
+
+---
+
+# Scénario 2
+
+---
+
+<!--
+- Ne vise pas à tester la distance, mais seulement le fonctionnement des relais
+-->
+
+![bg contain](./images/diagrams/relayed-maps.png)
+
+---
+
+# 8. Résultats
+
+---
+
+<!--
+- Les deux scénarios se sont déroulés sans encombre.
+
+- Les messages ont été reçus dans l'ordre sans aucune perte.
+
+- La distance maximale est plus élevée que prévu.
+-->
+
+![bg contain](./images/diagrams/chart-distance.png)
+
+---
+
+# 9. Analyse et discussion
+
+---
+
+<!--
+- Les résultats sont très satisfaisants.
+
+- Le système reste cependant limité par la distance et le temps de vie des messages.
+-->
+
+## Limitations
+
+* :straight_ruler: Distance
+* :alarm_clock: Time-to-live
+* :x: Obstacles
+
+
+---
+
+## Suffisant ?
+
+<!--
+- distance max: D = d * T 
+  - où D est la distance maximale, d la distance par saut, et T le nombre de sauts maximum (TTL)
+-->
+
+$$
+\begin{aligned}
+D &= d \times T \\
+&= 60\text{ [m]} \times 12 \\
+&= 720 \text{ [m]}
+\end{aligned}
+$$
+
+- $D$ : Distance maximale (en mètres)
+- $d$ : Distance par saut
+- $T$ : Nombre de sauts maximum
+
+---
+
+<!--
+- Pour qu'une telle distance se produise, il faudrait que toutes les conditions soient optimales, ce qui est peu probable.
+-->
+
+## Vraiment possible ?
+
+- #### **12** utilisateurs
+- #### **60** mètres entre chacun
+- #### Obstacles ?
+---
+
+<!--
+- Beaucoup plus avancé que ce qui était prévu
+  - Peut être utilisé dans des situations réelles
+
+- Quelques fonctionnalités qui manquent encore:
+  - Signature des messages pour la vérification de l'authenticité
+  - Ajout du routage IPv6 / interconnexion avec Internet
+
+- Ce projet c'est aussi:
+  - 8000+ lignes de code
+  - 200+ heures passées à développer, tester, documenter et optimiser
+-->
+
+# 10. Conclusion
 
 ---
 
@@ -398,3 +604,10 @@ $$
 ---
 
 # <!--fit--> Merci !
+
+---
+
+# <!--fit--> Leave a :star: on GitHub !
+
+<!-- # **github.com/cestef/meshlink** -->
+![bg right 75%](./images/qrcode.svg)
