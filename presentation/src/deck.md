@@ -152,6 +152,9 @@ fun main() {
 
 - Consommation: 10x moins que le Bluetooth
 
+- Utilisé dans l'IoT
+  - Car fonctionnnent souvent sur batterie
+
 - Omniprésent: Plusieurs milliards d'appareils
 -->
 
@@ -386,17 +389,21 @@ $$
 $$
 \begin{aligned}
 n &= \lceil \frac{T}{c} \rceil \\
-&= \lceil \frac{54350}{502} \rceil \\
-&= \lceil 108.3 \rceil \\
-&= 109 \\
+&= \lceil \frac{54350}{496} \rceil \\
+&= \lceil 109.57 \rceil \\
+&= 110 \\
 \end{aligned}
 $$
 
 ---
 
-# <!--fit--> **Elon** doit donc envoyer **109** morceaux.
+# <!--fit--> **Elon** doit donc envoyer **110** morceaux.
 
 ---
+
+<!--
+- 10kB/s
+-->
 
 ## Avec une vitesse de transmission de ~**20** morceaux par seconde, cela prendra ~**5** secondes.
 
@@ -431,7 +438,7 @@ $$
 $$
 \begin{aligned}
 P &= \frac{1}{\text{nombre d'identifiants possibles}} \\
-&= \frac{1}{\text{nombre d'adjectifs} \times \text{nombre de noms} \times \text{nombre de chiffres}} \\
+&= \frac{1}{\text{nbr d'adjectifs} \times \text{nbr de noms} \times \text{nbr de chiffres} \times \text{nbr de separateurs}} \\
 &= \frac{1}{979 \times 1844 \times 1000 \times 2} \\
 &= \frac{1}{3.6 \times 10^{9}} \\
 \end{aligned}
