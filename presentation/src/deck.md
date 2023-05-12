@@ -47,6 +47,19 @@ fun main() {
 
 # 1. Problématique
 
+<!--
+- Question à laquelle j'ai tenté de répondre
+
+- Fil rouge de ce projet
+
+- "en alternative à un réseau mobile":
+  - Par exemple:
+    - Réseau mobile indisponible (catastrophe naturelle, brouillage, blackout)
+    - Réseau mobile censuré
+
+
+-->
+
 ### Comment réaliser un système décentralisé de messagerie utilisant le Bluetooth en alternative à un réseau mobile ?
 
 ---
@@ -606,15 +619,24 @@ $$
 
 ---
 
-# <!--fit--> Questions ?
-
----
-
 # <!--fit--> Merci !
 
 ---
 
 # <!--fit--> Leave a :star: on GitHub !
 
-<!-- # **github.com/cestef/meshlink** -->
+<!-- github.com/cestef/meshlink -->
 ![bg right 75%](./images/qrcode.svg)
+
+---
+
+# <!--fit--> Questions ?
+
+---
+
+# Sources iconographiques
+
+- https://cdn.icon-icons.com/icons2/2699/PNG/512/sqlite_logo_icon_169724.png
+- https://upload.wikimedia.org/wikipedia/commons/thumb/d/da/Bluetooth.svg/1342px-Bluetooth.svg.png
+- https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/Kotlin_Icon.svg/2048px-Kotlin_Icon.svg.png
+- https://github.com/twitter/twemoji
