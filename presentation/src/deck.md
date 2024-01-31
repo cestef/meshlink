@@ -17,7 +17,7 @@ fun main() {
     println("Hello, MeshLink!")
 }
 ```
-#### Par *****REMOVED*****
+#### Par **Colin Stefani**
 ---
 
 # Contenu de la présentation
@@ -279,7 +279,11 @@ fun main() {
 
 ---
 
-# <!--fit-->Procédure de chiffrement
+<!--
+
+-->
+
+# Procédure de chiffrement hybride
 
 ---
 
@@ -316,7 +320,7 @@ fun main() {
 
 ---
 
-## Tech-stack
+#  <!--fit--> Tech-stack
 
 ---
 
@@ -445,6 +449,9 @@ $$
 ### Séparés par un **tiret** ou un **point**
 
 ---
+<!--
+Même si en réalité, la génération se fait à l'aide d'un LCG (linear congruential generator, générateur congruentiel linéaire) (48-bit LCG) , ce qui veut dire que la séquence est déterministe et va se répéter après un certain temps.
+-->
 
 ## Probabilité de collision
 
@@ -612,7 +619,7 @@ $$
 
 - Ce projet c'est aussi:
   - 8000+ lignes de code
-  - 200+ heures passées à développer, tester, documenter et optimiser
+  - centaines d'heures passées à développer, tester, documenter et optimiser
 -->
 
 # 10. Conclusion
